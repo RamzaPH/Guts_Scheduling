@@ -33,6 +33,16 @@ export default defineConfig(({ mode }) => {
       watch: {
         usePolling: true,
       },
+      // Force HMR client to connect directly to the Vite server port so
+      // browsers served through a proxy (host:8080) will still reach HMR.
+      // Use VITE_HMR_CLIENT_PORT env to override when necessary, but default
+      // to 5173 which is where Vite listens inside the container.
+      hmr: {
+        protocol: 'ws',
+        host: 'localhost',
+        port: 5173,
+        clientPort: Number(env.VITE_HMR_CLIENT_PORT || 5173),
+      },
       proxy: {
         '/api': {
           target: proxyTarget,

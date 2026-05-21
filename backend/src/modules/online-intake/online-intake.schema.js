@@ -1,6 +1,6 @@
 const Joi = require("joi");
 
-const sourceSchema = Joi.string().valid("saferoads", "otdc", "partner").required();
+const sourceSchema = Joi.string().valid("saferoads", "otdc", "odep", "partner").required();
 
 const manualIngestSchema = Joi.object({
   source: sourceSchema,

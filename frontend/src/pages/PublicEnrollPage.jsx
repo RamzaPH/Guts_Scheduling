@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { QR_ENROLLMENT_TEMPLATE, buildQrEnrollmentTemplate, resolveQrEnrollmentType } from "../shared/qrEnrollmentTemplate";
@@ -441,7 +441,12 @@ export default function PublicEnrollPage() {
       setShowPromoPrompt(true);
       return;
     }
+    const payload = buildPayload();
+    if (!payload) return; // buildPayload sets status when invalid
+    await submitPayload(payload);
+  }
 
+  function buildPayload() {
     setSubmitState("submitting");
     setStatus("Submitting your enrollment...");
 
@@ -449,7 +454,6 @@ export default function PublicEnrollPage() {
 
     const payload = {
       ...formData,
-      // Map gmail_account to student email so enrollment creates student with email
       student: {
         ...formData.student,
         email: formData.student?.email || formData.profile?.gmail_account || "",
@@ -458,7 +462,6 @@ export default function PublicEnrollPage() {
       enrollment: {
         ...(formData.enrollment || {}),
         promo_offer_id: formData.enrollment?.promo_offer_id ? Number(formData.enrollment.promo_offer_id) : null,
-        // Include any additional promos selected from the post-submit modal
         additional_promo_offer_ids: Array.isArray(selectedPromos) && selectedPromos.length > 0 ? [Number(selectedPromos[0])] : undefined,
         is_already_driver: normalizeBooleanValue(formData.enrollment?.is_already_driver),
         enrollment_channel: "qr_public",
@@ -487,15 +490,22 @@ export default function PublicEnrollPage() {
       if (!payload.promo_schedule?.tdc?.schedule_date) {
         setSubmitState("idle");
         setStatus("Please provide the desired TDC date.");
-        return;
+        return null;
       }
 
       if (payload.promo_schedule?.pdc?.enabled && !payload.promo_schedule?.pdc?.schedule_date) {
         setSubmitState("idle");
         setStatus("Please provide the desired PDC date when choosing Schedule Now.");
-        return;
+        return null;
       }
     }
+
+    return payload;
+  }
+
+  async function submitPayload(payload) {
+    setSubmitState("submitting");
+    setStatus("Submitting your enrollment...");
 
     try {
       const response = await fetch("/api/enroll/submit", {
@@ -560,6 +570,28 @@ export default function PublicEnrollPage() {
 
     return processedSections;
   }, [template, promoOptions, formData]);
+
+  const promoModalRef = useRef(null);
+
+  useEffect(() => {
+    if (showPromoPrompt) {
+      try {
+        window.scrollTo({ top: 0, behavior: "auto" });
+      } catch (e) {
+        void e; // ignore scroll errors in some browsers
+      }
+      setTimeout(() => {
+        try {
+          if (promoModalRef.current) {
+            promoModalRef.current.scrollIntoView({ block: "center" });
+            promoModalRef.current.focus?.();
+          }
+        } catch (e) {
+          void e; // ignore focus/scrollIntoView errors
+        }
+      }, 60);
+    }
+  }, [showPromoPrompt]);
 
   if (!token) {
     return (
@@ -698,7 +730,7 @@ export default function PublicEnrollPage() {
           {showPromoPrompt ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center">
               <div className="absolute inset-0 bg-black/40" onClick={() => { setShowPromoPrompt(false); setWantsPromo(null); }} />
-              <div className="relative mx-4 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-lg">
+              <div ref={promoModalRef} tabIndex={-1} className="relative mx-4 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-lg">
                 <h3 className="text-lg font-bold">Would you like to add an additional promo?</h3>
                 <p className="mt-2 text-sm text-slate-600">Choose one promo from the website list, including promos that apply to this enrollment type.</p>
 
@@ -751,18 +783,17 @@ export default function PublicEnrollPage() {
                   <button
                     type="button"
                     disabled={wantsPromo && selectedPromos.length === 0}
-                    onClick={() => {
-                      // Confirm choice and proceed to submit
+                    onClick={async () => {
+                      // Confirm choice and proceed to submit directly to avoid
+                      // racing state updates that required a second click.
                       setPromoConfirmed(true);
                       setShowPromoPrompt(false);
                       setStatus("");
-                      // If user said no, clear selected promos
                       if (!wantsPromo) setSelectedPromos([]);
-                      // programmatically submit the form by calling handleSubmit again
-                      // We simulate by invoking submission flow: create a new submit event
-                      const fakeEvent = { preventDefault: () => {} };
-                      // small timeout to allow modal to close visually
-                      setTimeout(() => handleSubmit(fakeEvent), 50);
+
+                      const payload = buildPayload();
+                      if (!payload) return;
+                      await submitPayload(payload);
                     }}
                     className="rounded-lg bg-[#800000] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >Continue</button>

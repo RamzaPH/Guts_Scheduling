@@ -48,10 +48,10 @@ if (Test-Path $envFile) {
 Push-Location $repoRoot
 try {
   Write-Step "Starting production stack (docker-compose.prod.yml)"
-  docker compose -f docker-compose.prod.yml up -d --build
+  docker compose -p guts -f docker-compose.prod.yml up -d --build
 
   Write-Step "Service status"
-  docker compose -f docker-compose.prod.yml ps
+  docker compose -p guts -f docker-compose.prod.yml ps
 
   if (-not $SkipHealthCheck) {
     Write-Step "Running health checks via frontend entrypoint"

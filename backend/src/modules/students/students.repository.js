@@ -108,12 +108,14 @@ const latestEnrollmentInclude = {
       attributes: ["id", "name", "fixed_price", "discounted_price"],
       required: false,
     },
-    {
-      model: Payment,
-      as: "payments",
-      attributes: ["id", "amount", "payment_method", "payment_status", "reference_number", "account_number", "created_at"],
-      required: false,
-    },
+        {
+          model: Payment,
+          as: "payments",
+          attributes: ["id", "amount", "payment_method", "payment_status", "reference_number", "account_number", "created_at"],
+          required: false,
+          separate: true,
+          order: [["created_at", "ASC"], ["id", "ASC"]],
+        },
     {
       model: Schedule,
       attributes: ["id", "remarks", "student_remarks", "instructor_remarks"],

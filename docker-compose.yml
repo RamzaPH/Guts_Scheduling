@@ -1,4 +1,6 @@
 # Development-only compose profile.
+# Explicit project name prevents duplicate stacks when the repo is opened via symlink.
+name: guts
 # For server/production deployment, use docker-compose.prod.yml.
 services:
   db:
@@ -9,7 +11,7 @@ services:
       MYSQL_DATABASE: ${DB_NAME:-guts_db}
       # Force creation of the application DB user (avoid host .env overrides)
       MYSQL_USER: guts_app
-      MYSQL_PASSWORD: change_me_db_password
+      MYSQL_PASSWORD: ${DB_PASSWORD}
     command:
       - --default-authentication-plugin=mysql_native_password
       - --character-set-server=utf8mb4
@@ -39,7 +41,7 @@ services:
       DB_NAME: ${DB_NAME:-guts_db}
       # Use the application DB user that the DB service creates
       DB_USER: guts_app
-      DB_PASSWORD: change_me_db_password
+      DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:-change_me_to_long_random_secret}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       DB_SYNC: "false"
@@ -93,7 +95,7 @@ services:
     environment:
       - VITE_API_BASE_URL=http://localhost:5000/api
       - VITE_API_PROXY_TARGET=http://backend:5000
-      - VITE_HMR_CLIENT_PORT=8080
+      - VITE_HMR_CLIENT_PORT=5173
     volumes:
       - ./frontend:/app
       - /app/node_modules

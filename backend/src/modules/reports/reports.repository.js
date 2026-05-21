@@ -46,7 +46,7 @@ async function findEnrollmentsByDateRange(start, end) {
       },
     },
     include: [
-      { model: Student, attributes: ["id", "first_name", "last_name"] },
+    { model: Student, attributes: ["id", "first_name", "last_name"], required: true },
       { model: DLCode, attributes: ["id", "code", "description"] },
       {
         model: Schedule,
@@ -180,6 +180,7 @@ async function findCompletedEnrollmentsWithVehicleByDateRange(start, end) {
       },
     },
     include: [
+      { model: Student, attributes: ["id", "first_name", "last_name"], required: true },
       { model: DLCode, attributes: ["id", "code", "description"] },
       {
         model: Schedule,
@@ -229,8 +230,11 @@ module.exports = {
       include: [
         {
           model: Enrollment,
-          attributes: ["id"],
-          required: false,
+          attributes: ["id", "student_id"],
+          required: true,
+          include: [
+            { model: Student, attributes: ["id"], required: true },
+          ],
         },
       ],
       attributes: ["id", "enrollment_id", "amount", "payment_method", "payment_status", "reference_number", "account_number", "created_at"],

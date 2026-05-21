@@ -133,7 +133,7 @@ const vehicleCreateSchema = Joi.object({
   plate_number: Joi.string().trim().required(),
   vehicle_type: Joi.string().valid("Sedan", "Motorcycle", "Tricycle", "Car", "Motor").required(),
   transmission_type: Joi.string().valid("Automatic", "Manual").default("Automatic"),
-  status: Joi.string().valid("Available", "In Service", "Maintenance", "Archived").default("Available"),
+  status: Joi.string().valid("Available", "In use", "In Service", "Maintenance", "Archived").default("Available"),
 });
 
 const vehicleUpdateSchema = Joi.object({
@@ -141,7 +141,7 @@ const vehicleUpdateSchema = Joi.object({
   plate_number: Joi.string().trim(),
   vehicle_type: Joi.string().valid("Sedan", "Motorcycle", "Tricycle", "Car", "Motor"),
   transmission_type: Joi.string().valid("Automatic", "Manual"),
-  status: Joi.string().valid("Available", "In Service", "Maintenance", "Archived"),
+  status: Joi.string().valid("Available", "In use", "In Service", "Maintenance", "Archived"),
 }).min(1);
 
 const maintenanceCreateSchema = Joi.object({
@@ -164,6 +164,8 @@ const maintenanceUpdateSchema = Joi.object({
 
 const fuelCreateSchema = Joi.object({
   vehicle_id: Joi.number().integer().positive().required(),
+  station_name: optionalText,
+  price_per_liter: Joi.number().min(0).allow(null),
   liters: Joi.number().positive().required(),
   amount_spent: Joi.number().positive().required(),
   odometer_reading: Joi.number().min(0).required(),
@@ -183,6 +185,8 @@ const fuelCreateSchema = Joi.object({
 
 const fuelUpdateSchema = Joi.object({
   vehicle_id: Joi.number().integer().positive(),
+  station_name: optionalText,
+  price_per_liter: Joi.number().min(0).allow(null),
   liters: Joi.number().positive(),
   amount_spent: Joi.number().positive(),
   odometer_reading: Joi.number().min(0),

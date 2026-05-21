@@ -70,7 +70,7 @@ if ($Mode -eq "docker") {
 
   Push-Location $repoRoot
   try {
-    docker compose up -d --build
+    docker compose -p guts up -d --build
   }
   finally {
     Pop-Location

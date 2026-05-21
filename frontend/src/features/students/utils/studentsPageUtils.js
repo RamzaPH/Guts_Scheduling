@@ -65,8 +65,11 @@ export function getEnrollmentPaymentSummary(enrollment, student) {
   const isImportedTdc = sourceLabel !== "Walk-in" && (courseCode === "TDC" || courseCode === "N/A");
   const isFixedPaymentImport = isImportedTdc && (sourceLabel === "SafeRoads.ph" || sourceLabel === "OTDC.ph");
   const payments = Array.isArray(enrollment?.payments) ? enrollment.payments : [];
-  const totalDue = Math.max(toNumber(enrollment?.fee_amount) - toNumber(enrollment?.discount_amount), 0);
-  const totalPaid = payments.reduce((sum, payment) => sum + toNumber(payment?.amount), 0);
+  let totalDue = Math.max(toNumber(enrollment?.fee_amount) - toNumber(enrollment?.discount_amount), 0);
+  // If there is a promo package purchase and additional promos amount, only count
+  // payments made after the promo purchase towards the promo delta so already-paid
+  // items are excluded from the promo balance. (value not needed here)
+  let totalPaid = payments.reduce((sum, payment) => sum + toNumber(payment?.amount), 0);
   const lifecycleStatus = String(enrollment?.status || "").toLowerCase();
 
   if (isFixedPaymentImport) {
@@ -253,8 +256,8 @@ export function buildAddress(profile) {
       const auto = getZipCodeByAddressCodes(profile.region, profile.province, profile.city);
       zip = auto || zip;
     }
-  } catch {
-    // If location helpers fail for any reason, fall back to raw values
+  } catch (e) {
+    void e; // ignore location helper failures
   }
 
   const parts = [house, street, barangay, city, province, region, zip].filter(Boolean);

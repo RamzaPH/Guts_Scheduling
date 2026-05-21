@@ -173,7 +173,7 @@ async function run() {
   const source = args.source || null;
 
   if (!filePath || !source) {
-    throw new Error("Usage: node scripts/importOnlineApplicationsCsv.js --source=saferoads --file=./imports/online.csv");
+    throw new Error("Usage: node scripts/importOnlineApplicationsCsv.js --source=saferoads|otdc|odep --file=./imports/online.csv");
   }
 
   if (!fs.existsSync(filePath)) {

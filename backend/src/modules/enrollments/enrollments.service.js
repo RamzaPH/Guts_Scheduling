@@ -201,11 +201,11 @@ function attachPaymentSummary(enrollment) {
 
   const plain = enrollment.toJSON ? enrollment.toJSON() : enrollment;
   const payments = Array.isArray(plain.payments) ? plain.payments : [];
-  const totalPaid = payments.reduce((sum, payment) => sum + toCurrencyNumber(payment.amount), 0);
   const discountAmount = toCurrencyNumber(plain.discount_amount);
   const grossFee = toCurrencyNumber(plain.fee_amount);
-  const totalDue = Math.max(grossFee - discountAmount, 0);
-  const remainingBalance = Math.max(totalDue - totalPaid, 0);
+  let totalDue = Math.max(grossFee - discountAmount, 0);
+  let totalPaid = payments.reduce((sum, payment) => sum + toCurrencyNumber(payment.amount), 0);
+  let remainingBalance = Math.max(totalDue - totalPaid, 0);
 
   return {
     ...plain,
@@ -1057,13 +1057,26 @@ async function editEnrollment(id, payload) {
       }
     }
 
-    if (Object.prototype.hasOwnProperty.call(enrollmentPayload, "additional_promo_offer_ids")) {
-      const additionalPromoComputation = await validateAndComputeAdditionalPromos({
-        enrollmentType: enrollmentTypeFromDlCodeCode(enrollment?.DLCode?.code),
-        primaryPromoOfferId: enrollmentPayload.promo_offer_id ?? enrollment.promo_offer_id,
-        additionalPromoIds: enrollmentPayload.additional_promo_offer_ids,
-        transaction,
-      });
+    const hasAdditionalPromoIds = Object.prototype.hasOwnProperty.call(enrollmentPayload, "additional_promo_offer_ids");
+    const hasAdditionalPromoAmount = Object.prototype.hasOwnProperty.call(enrollmentPayload, "additional_promos_amount");
+
+    if (hasAdditionalPromoIds || hasAdditionalPromoAmount) {
+      let normalizedIds = Array.isArray(enrollment.additional_promo_offer_ids) ? enrollment.additional_promo_offer_ids : [];
+      let nextAdditionalAmount = toCurrencyNumber(
+        hasAdditionalPromoAmount ? enrollmentPayload.additional_promos_amount : enrollment.additional_promos_amount
+      );
+
+      if (hasAdditionalPromoIds) {
+        const additionalPromoComputation = await validateAndComputeAdditionalPromos({
+          enrollmentType: enrollmentTypeFromDlCodeCode(enrollment?.DLCode?.code),
+          primaryPromoOfferId: enrollmentPayload.promo_offer_id ?? enrollment.promo_offer_id,
+          additionalPromoIds: enrollmentPayload.additional_promo_offer_ids,
+          transaction,
+        });
+
+        normalizedIds = additionalPromoComputation.normalizedIds;
+        nextAdditionalAmount = additionalPromoComputation.additionalPromosAmount;
+      }
 
       const currentFeeAmount = toCurrencyNumber(
         Object.prototype.hasOwnProperty.call(enrollmentPayload, "fee_amount")
@@ -1073,21 +1086,7 @@ async function editEnrollment(id, payload) {
       const previousAdditionalAmount = toCurrencyNumber(enrollment.additional_promos_amount);
       const baseFeeAmount = Math.max(currentFeeAmount - previousAdditionalAmount, 0);
 
-      enrollmentPayload.additional_promo_offer_ids = additionalPromoComputation.normalizedIds;
-      enrollmentPayload.additional_promos_amount = additionalPromoComputation.additionalPromosAmount;
-      enrollmentPayload.fee_amount = Number((baseFeeAmount + additionalPromoComputation.additionalPromosAmount).toFixed(2));
-    }
-
-    if (Object.prototype.hasOwnProperty.call(enrollmentPayload, "additional_promos_amount")) {
-      const currentFeeAmount = toCurrencyNumber(
-        Object.prototype.hasOwnProperty.call(enrollmentPayload, "fee_amount")
-          ? enrollmentPayload.fee_amount
-          : enrollment.fee_amount
-      );
-      const previousAdditionalAmount = toCurrencyNumber(enrollment.additional_promos_amount);
-      const nextAdditionalAmount = toCurrencyNumber(enrollmentPayload.additional_promos_amount);
-      const baseFeeAmount = Math.max(currentFeeAmount - previousAdditionalAmount, 0);
-
+      enrollmentPayload.additional_promo_offer_ids = normalizedIds;
       enrollmentPayload.additional_promos_amount = nextAdditionalAmount;
       enrollmentPayload.fee_amount = Number((baseFeeAmount + nextAdditionalAmount).toFixed(2));
     }

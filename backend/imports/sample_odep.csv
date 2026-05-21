@@ -1,0 +1,3 @@
+external_ref,first_name,last_name,enrollment_type,email,phone
+odep-001,Juan,Dela Cruz,TDC,juan@example.com,09171234567
+odep-002,Ana,Santos,PROMO,ana@example.com,09179876543

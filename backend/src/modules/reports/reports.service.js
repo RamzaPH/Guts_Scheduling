@@ -365,7 +365,7 @@ async function getOverviewReports({ startDate, endDate, courseFilter = "overall"
     const source = String(
       student?.source_channel || student?.external_source || (student?.StudentProfile && student.StudentProfile.tdc_source) || ""
     ).toLowerCase();
-    return source === "saferoads" || source === "otdc";
+    return source === "saferoads" || source === "otdc" || source === "odep";
   });
 
   const importedStudentMembership = importedSourceStudents.filter(() => {

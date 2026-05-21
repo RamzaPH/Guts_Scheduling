@@ -21,7 +21,7 @@ async function backfillImportedPayments() {
       const [updatedEnrollments] = await sequelize.query(
         `UPDATE Enrollments
          SET fee_amount = :importedAmount
-         WHERE enrollment_channel IN ('otdc', 'saferoads')
+         WHERE enrollment_channel IN ('otdc', 'saferoads', 'odep')
            AND CAST(fee_amount AS DECIMAL(10,2)) <> :importedAmount`,
         {
           replacements: { importedAmount: IMPORTED_TDC_AMOUNT },
@@ -33,7 +33,7 @@ async function backfillImportedPayments() {
         `UPDATE Payments p
          INNER JOIN Enrollments e ON e.id = p.enrollment_id
          SET p.amount = :importedAmount
-         WHERE e.enrollment_channel IN ('otdc', 'saferoads')
+         WHERE e.enrollment_channel IN ('otdc', 'saferoads', 'odep')
            AND p.payment_status = 'paid'
            AND CAST(p.amount AS DECIMAL(10,2)) <> :importedAmount`,
         {
@@ -48,7 +48,7 @@ async function backfillImportedPayments() {
       const importedEnrollments = await sequelize.query(
         `SELECT e.id, e.student_id, e.fee_amount, e.payment_reference_number, e.external_application_ref, e.enrollment_channel, e.created_at
          FROM Enrollments e
-         WHERE e.enrollment_channel IN ('otdc', 'saferoads')
+         WHERE e.enrollment_channel IN ('otdc', 'saferoads', 'odep')
          AND NOT EXISTS (SELECT 1 FROM Payments p WHERE p.enrollment_id = e.id)`,
       {
         transaction,

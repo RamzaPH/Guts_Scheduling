@@ -9,6 +9,24 @@ $processNames = @('Docker Desktop', 'docker', 'vpnkit', 'com.docker', 'dockerd',
 $processes = @()
 Get-Process | Where-Object { $_.ProcessName -in $processNames } | ForEach-Object { $processes += $_ }
 
+# Also attempt to find processes by image/commandline using WMI (handles 'Docker Desktop.exe' exact image names)
+try {
+    $wmiMatches = Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'Docker(.exe)?' -or ($_.CommandLine -and $_.CommandLine -match 'Docker Desktop') }
+    foreach ($p in $wmiMatches) {
+        if (-not ($processes | Where-Object { $_.Id -eq $p.ProcessId })) {
+            try {
+                $proc = Get-Process -Id $p.ProcessId -ErrorAction Stop
+                $processes += $proc
+            } catch {
+                # If Get-Process failed, create a synthetic object with Id only
+                $processes += (New-Object PSObject -Property @{ Id = $p.ProcessId; ProcessName = $p.Name })
+            }
+        }
+    }
+} catch {
+    # ignore WMI errors
+}
+
 if ($processes.Count -gt 0) {
     Write-Host "Stopping processes"
     $processes | ForEach-Object { 

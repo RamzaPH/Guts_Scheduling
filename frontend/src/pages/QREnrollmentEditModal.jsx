@@ -20,7 +20,6 @@ export default function QREnrollmentEditModal({ isOpen, enrollment, onClose, onS
       || enrollment?.qrCode?.name
       || ""
   ).trim().toUpperCase();
-  const isTdcEnrollment = enrollmentType === "TDC";
   const isPdcEnrollment = enrollmentType === "PDC";
   const isPromoEnrollment = enrollmentType === "PROMO";
   const [form, setForm] = useState({
@@ -106,7 +105,7 @@ export default function QREnrollmentEditModal({ isOpen, enrollment, onClose, onS
       });
       setErrorMessage("");
     });
-  }, [isOpen, enrollment]);
+  }, [isOpen, enrollment, isPdcEnrollment]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {

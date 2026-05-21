@@ -6,6 +6,14 @@ module.exports = (sequelize) => {
 			type: DataTypes.INTEGER,
 			allowNull: false,
 		},
+		station_name: {
+			type: DataTypes.STRING(255),
+			allowNull: true,
+		},
+		price_per_liter: {
+			type: DataTypes.DECIMAL(12, 2),
+			allowNull: true,
+		},
 		liters: {
 			type: DataTypes.DECIMAL(10, 2),
 			allowNull: false,

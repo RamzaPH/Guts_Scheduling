@@ -74,10 +74,10 @@ export default function AppLayout() {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") {
-      return "dark";
+      return "light";
     }
 
-    return window.localStorage.getItem(THEME_KEY) || "dark";
+    return window.localStorage.getItem(THEME_KEY) || "light";
   });
   const reportsContainerRef = useRef(null);
   const studentsContainerRef = useRef(null);
@@ -96,6 +96,7 @@ export default function AppLayout() {
       { to: "/students?view=qr", label: "QR Enrollment/Enrollment Page Database" },
       { to: "/students?view=otdc", label: "OTDC Database" },
       { to: "/students?view=saferoads", label: "Saferoads Database" },
+      { to: "/students?view=odep", label: "Saferoads Database(ODEP)" },
     ],
     []
   );
@@ -105,6 +106,7 @@ export default function AppLayout() {
       { to: "/payments?view=qr", label: "QR Enrollment/Enrollment Page Payment Ledger" },
       { to: "/payments?view=otdc", label: "OTDC Payment Ledger" },
       { to: "/payments?view=saferoads", label: "Saferoads Payment Ledger" },
+      { to: "/payments?view=odep", label: "Saferoads Payment Ledger(ODEP)" },
     ],
     []
   );

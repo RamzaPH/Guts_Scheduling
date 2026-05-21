@@ -81,7 +81,7 @@ if [[ "$MODE" == "docker" ]]; then
 
   ensure_file_from_template "$REPO_ROOT/.env.docker.example" "$REPO_ROOT/.env"
 
-  (cd "$REPO_ROOT" && docker compose up -d --build)
+  (cd "$REPO_ROOT" && docker compose -p guts up -d --build)
   step "Docker stack started. Open http://localhost:8080"
   exit 0
 fi

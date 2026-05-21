@@ -57,10 +57,10 @@ fi
 (
   cd "$REPO_ROOT"
   step "Starting production stack (docker-compose.prod.yml)"
-  docker compose -f docker-compose.prod.yml up -d --build
+  docker compose -p guts -f docker-compose.prod.yml up -d --build
 
   step "Service status"
-  docker compose -f docker-compose.prod.yml ps
+  docker compose -p guts -f docker-compose.prod.yml ps
 
   if [[ "$SKIP_HEALTH_CHECK" != "true" ]]; then
     step "Running health checks via frontend entrypoint"

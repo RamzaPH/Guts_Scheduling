@@ -13,26 +13,12 @@ const enrollingForOptions = [
   "DEFENSIVE DRIVING SEMINAR (WITH NON PRO/ PRO LICENSE)",
 ];
 const pdcClassificationOptions = ["Beginner", "Experience"];
-const tdcSourceOptions = ["guts", "external"];
-const trainingMethodOptions = [
-  "Experienced (w/ experience in driving/Applicable para sa marunong na talaga magdrive)",
-  "BEGINNER ( w/out Experience in Driving / Driving Enhancement/ Magpapaturo pa magdrive)",
-  "ADD RC/DL Codes -EXPERIENCED ( Para sa mga magpapadagdag ng DL Codes na marunong na talaga magdrive)",
-  "ADD RC/DL Codes -BEGINNER ( Para sa mga magpapadagdag ng DL Codes na Magpapaturo pa mag drive)",
-  "DRIVING LESSON ( Para sa mga may lisensya na at may DLCodes na B/B1 na Magpapaturo pa magdrive)",
-  "Other",
-];
 const yesNoOptions = ["true", "false"];
 const pdcVehicleTypeOptions = [
   "DL Codes A - Motorcycle (2 wheels)",
   "DL Codes A1 - Tricycle (3 wheels)",
   "DL Codes B - Car/Sedan (4 wheels - 8 seaters below)",
   "DL Codes B1 - L300/Van (4 wheels - 9 seaters above)",
-  "Other",
-];
-const pdcTransmissionTypeOptions = [
-  "AUTOMATIC TRANSMISSION (A/T) not allowed to drive M/T",
-  "MANUAL TRANSMISSION (M/T) allowed to drive A/T",
   "Other",
 ];
 const promoPdcEnrollingForOptions = [
@@ -43,7 +29,7 @@ const promoPdcEnrollingForOptions = [
   "DRIVING LESSON ( w/ license already)",
   "Other",
 ];
-const promoDrivingSchoolOptions = ["GUTS Driving School", "Other"];
+// Removed unused option lists to satisfy linting (previously defined but not used)
 
 function section(title, description, fields = []) {
   return { title, description, fields };

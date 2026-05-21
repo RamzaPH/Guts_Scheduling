@@ -24,18 +24,18 @@ Write-Step "Restarting Docker stack from $repoRoot"
 
 if ($NoBuild) {
   Write-Step "Using restart-only mode (no image rebuild)"
-  docker compose restart backend frontend
+  docker compose -p guts restart backend frontend
 } else {
   Write-Step "Using rebuild mode (recommended before presentations)"
-  docker compose up -d --build backend frontend
+  docker compose -p guts up -d --build backend frontend
 }
 
 Write-Step "Current service status"
-docker compose ps
+docker compose -p guts ps
 
 if ($ShowLogs) {
   Write-Step "Tailing recent backend/frontend logs"
-  docker compose logs backend frontend --tail=60
+  docker compose -p guts logs backend frontend --tail=60
 }
 
 Write-Step "Done. App URL: http://localhost:8080"

@@ -24,6 +24,7 @@ const PAGE_SIZE = 6;
 
 const STATUS_STYLES = {
   Available: "bg-emerald-100 text-emerald-700 border border-emerald-300",
+  "In use": "bg-blue-100 text-blue-700 border border-blue-300",
   Scheduled: "bg-yellow-100 text-yellow-800 border border-yellow-300",
   "Under Maintenance": "bg-rose-100 text-rose-800 border border-rose-300",
   "In Service": "bg-amber-100 text-amber-700 border border-amber-300",
@@ -70,6 +71,7 @@ function normalizeVehicleStatus(value) {
   if (raw.includes("arch")) return "Archived";
   if (raw.includes("maint")) return "Maintenance";
   if (raw.includes("service")) return "In Service";
+  if (raw.includes("in use")) return "In use";
   return "Available";
 }
 
@@ -103,13 +105,17 @@ function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function resolveStatusForDate({ baseStatus, latestLog, scheduleRows, statusDate }) {
+function resolveStatusForDate({ baseStatus, latestLog, scheduleRows, statusDate, isInUse = false }) {
   if (baseStatus === "Archived") {
     return "Archived";
   }
 
   if (baseStatus === "Maintenance") {
     return "Under Maintenance";
+  }
+
+  if (isInUse || baseStatus === "In use") {
+    return "In use";
   }
 
   const selectedDate = String(statusDate || todayIsoDate());
@@ -178,12 +184,24 @@ function emptyMaintenanceForm() {
 function emptyFuelForm() {
   return {
     vehicle_id: "",
+    station_name: "",
+    price_per_liter: "",
     liters: "",
     amount_spent: "",
     odometer_reading: "",
     odometer_start: "",
     odometer_end: "",
     logged_at: new Date().toISOString().slice(0, 10),
+  };
+}
+
+function emptyFuelEntry() {
+  return {
+    station_name: "",
+    price_per_liter: "",
+    liters: "",
+    amount_spent: "",
+    odometer_reading: "",
   };
 }
 
@@ -263,10 +281,12 @@ export default function VehiclesPage() {
   const [activeUsages, setActiveUsages] = useState([]);
   const [instructors, setInstructors] = useState([]);
   const [isLogUsageOpen, setIsLogUsageOpen] = useState(false);
-  const [logUsageForm, setLogUsageForm] = useState(() => ({ vehicle_id: "", instructor_id: "", start_odometer: "", start_date: new Date().toISOString().slice(0,10), liters: "", amount_spent: "", odometer_reading: "", notes: "" }));
+  const [logUsageForm, setLogUsageForm] = useState(() => ({ vehicle_id: "", instructor_id: "", start_odometer: "", start_date: new Date().toISOString().slice(0,10), notes: "" }));
   const [logUsageSaving, setLogUsageSaving] = useState(false);
   const [isEndUsageOpen, setIsEndUsageOpen] = useState(false);
   const [endUsageForm, setEndUsageForm] = useState(() => ({ id: "", end_odometer: "", end_date: new Date().toISOString().slice(0,10) }));
+  const [endFuelEntries, setEndFuelEntries] = useState(() => [emptyFuelEntry()]);
+  const [endUsageContext, setEndUsageContext] = useState(null);
   const [endUsageSaving, setEndUsageSaving] = useState(false);
   const [vehicleActionLoadingId, setVehicleActionLoadingId] = useState(null);
 
@@ -342,6 +362,7 @@ export default function VehiclesPage() {
 
   const rowsWithStatus = useMemo(() => {
     const selectedDate = normalizeDateInput(statusDate);
+    const activeUsageIds = new Set((activeUsages || []).map((usage) => Number(usage?.vehicle_id)).filter(Boolean));
 
     return rows.map((row) => {
       const relatedSchedules = (scheduleRows || []).filter((schedule) => scheduleMatchesVehicle(schedule, row));
@@ -350,6 +371,7 @@ export default function VehiclesPage() {
         latestLog: row.latestMaintenance,
         scheduleRows: relatedSchedules,
         statusDate: selectedDate,
+        isInUse: activeUsageIds.has(Number(row.id)),
       });
 
       return {
@@ -357,7 +379,7 @@ export default function VehiclesPage() {
         status,
       };
     });
-  }, [rows, scheduleRows, statusDate]);
+  }, [rows, scheduleRows, statusDate, activeUsages]);
 
   const filteredRows = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -820,6 +842,8 @@ export default function VehiclesPage() {
                                   const active = activeUsages.find((u) => Number(u.vehicle_id) === Number(row.id));
                                   if (!active) return;
                                   setEndUsageForm({ id: active.id, end_odometer: "", end_date: new Date().toISOString().slice(0,10) });
+                                  setEndFuelEntries([emptyFuelEntry()]);
+                                  setEndUsageContext(active);
                                   setIsEndUsageOpen(true);
                                 }}
                                 className="inline-flex items-center justify-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -829,6 +853,11 @@ export default function VehiclesPage() {
                               </button>
                             </div>
                           ) : null}
+                        {activeUsages.some((u) => Number(u.vehicle_id) === Number(row.id)) ? (
+                          <p className="mt-2 text-[11px] text-slate-500">
+                            Started: {activeUsages.find((u) => Number(u.vehicle_id) === Number(row.id))?.start_date || "-"} | Odometer: {activeUsages.find((u) => Number(u.vehicle_id) === Number(row.id))?.start_odometer ?? "-"}
+                          </p>
+                        ) : null}
                         </div>
 
                         <button
@@ -1061,7 +1090,7 @@ export default function VehiclesPage() {
                 onClick={() => {
                   if (!logUsageSaving) {
                     setIsLogUsageOpen(false);
-                    setLogUsageForm({ vehicle_id: "", instructor_id: "", start_odometer: "", start_date: new Date().toISOString().slice(0,10), liters: "", amount_spent: "", odometer_reading: "", notes: "" });
+                    setLogUsageForm({ vehicle_id: "", instructor_id: "", start_odometer: "", start_date: new Date().toISOString().slice(0,10), notes: "" });
                   }
                 }}
                 className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
@@ -1090,19 +1119,10 @@ export default function VehiclesPage() {
                     notes: logUsageForm.notes || null,
                   });
 
-                  // Create fuel log if fuel fields are filled
-                  if (logUsageForm.liters || logUsageForm.amount_spent) {
-                    await resourceServices.fuelLogs.create({
-                      vehicle_id: Number(logUsageForm.vehicle_id),
-                      liters: logUsageForm.liters ? Number(logUsageForm.liters) : null,
-                      amount_spent: logUsageForm.amount_spent ? Number(logUsageForm.amount_spent) : null,
-                      odometer_reading: logUsageForm.odometer_reading ? Number(logUsageForm.odometer_reading) : null,
-                      logged_at: logUsageForm.start_date,
-                    });
-                  }
+                  await resourceServices.vehicles.update(Number(logUsageForm.vehicle_id), { status: "In use" });
 
                   setIsLogUsageOpen(false);
-                  setLogUsageForm({ vehicle_id: "", instructor_id: "", start_odometer: "", start_date: new Date().toISOString().slice(0,10), liters: "", amount_spent: "", odometer_reading: "", notes: "" });
+                  setLogUsageForm({ vehicle_id: "", instructor_id: "", start_odometer: "", start_date: new Date().toISOString().slice(0,10), notes: "" });
                   await loadVehicles();
                   window.alert("Vehicle usage logged successfully.");
                 } catch (saveError) {
@@ -1169,45 +1189,6 @@ export default function VehiclesPage() {
                 </label>
               </div>
 
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                <h3 className="mb-2 text-xs font-semibold uppercase text-amber-900">Fuel Expenses (Optional)</h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600 uppercase">
-                    Liters
-                    <input
-                      value={logUsageForm.liters}
-                      onChange={(ev) => setLogUsageForm((c) => ({ ...c, liters: ev.target.value }))}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-[#800000]"
-                      placeholder="e.g. 25.5"
-                      type="number"
-                      step="0.01"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600 uppercase">
-                    Amount Spent
-                    <input
-                      value={logUsageForm.amount_spent}
-                      onChange={(ev) => setLogUsageForm((c) => ({ ...c, amount_spent: ev.target.value }))}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-[#800000]"
-                      placeholder="e.g. 1250.00"
-                      type="number"
-                      step="0.01"
-                    />
-                  </label>
-                </div>
-                <label className="mt-2 flex flex-col gap-1 text-xs font-semibold text-slate-600 uppercase">
-                  Odometer Reading (Fuel Fill-up)
-                  <input
-                    value={logUsageForm.odometer_reading}
-                    onChange={(ev) => setLogUsageForm((c) => ({ ...c, odometer_reading: ev.target.value }))}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-[#800000]"
-                    placeholder="e.g. 12345.6"
-                    type="number"
-                    step="0.01"
-                  />
-                </label>
-              </div>
-
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600 uppercase">
                 Notes (Optional)
                 <textarea
@@ -1224,7 +1205,7 @@ export default function VehiclesPage() {
                   type="button"
                   onClick={() => {
                     setIsLogUsageOpen(false);
-                    setLogUsageForm({ vehicle_id: "", instructor_id: "", start_odometer: "", start_date: new Date().toISOString().slice(0,10), liters: "", amount_spent: "", odometer_reading: "", notes: "" });
+                    setLogUsageForm({ vehicle_id: "", instructor_id: "", start_odometer: "", start_date: new Date().toISOString().slice(0,10), notes: "" });
                   }}
                   className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
@@ -1257,6 +1238,7 @@ export default function VehiclesPage() {
                   if (!endUsageSaving) {
                     setIsEndUsageOpen(false);
                     setEndUsageForm({ id: "", end_odometer: "", end_date: new Date().toISOString().slice(0,10) });
+                    setEndUsageContext(null);
                   }
                 }}
                 className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
@@ -1274,14 +1256,59 @@ export default function VehiclesPage() {
                   return;
                 }
 
+                const validFuelEntries = endFuelEntries
+                  .map((entry) => ({
+                    station_name: String(entry.station_name || "").trim(),
+                    price_per_liter: String(entry.price_per_liter || "").trim(),
+                    liters: String(entry.liters || "").trim(),
+                    amount_spent: String(entry.amount_spent || "").trim(),
+                    odometer_reading: String(entry.odometer_reading || "").trim(),
+                  }))
+                  .filter((entry) => entry.station_name || entry.price_per_liter || entry.liters || entry.amount_spent || entry.odometer_reading);
+
+                if (validFuelEntries.length === 0) {
+                  window.alert("Please add at least one fuel expense entry before completing usage.");
+                  return;
+                }
+
+                const hasIncompleteFuel = validFuelEntries.some((entry) => !entry.station_name || !entry.price_per_liter || !entry.liters || !entry.amount_spent || !entry.odometer_reading);
+                if (hasIncompleteFuel) {
+                  window.alert("Please complete every field for each fuel expense entry.");
+                  return;
+                }
+
                 setEndUsageSaving(true);
                 try {
+                  // update usage
                   await resourceServices.vehicleUsages.update(endUsageForm.id, {
                     end_odometer: Number(endUsageForm.end_odometer),
                     end_date: endUsageForm.end_date,
                   });
+
+                  // find active usage to get vehicle id
+                  const active = activeUsages.find((u) => String(u.id) === String(endUsageForm.id) || Number(u.id) === Number(endUsageForm.id));
+                  const vehicleId = active?.vehicle_id || null;
+
+                  if (vehicleId) {
+                    for (const entry of validFuelEntries) {
+                      await resourceServices.fuelLogs.create({
+                        vehicle_id: Number(vehicleId),
+                        station_name: entry.station_name,
+                        price_per_liter: Number(entry.price_per_liter),
+                        liters: Number(entry.liters),
+                        amount_spent: Number(entry.amount_spent),
+                        odometer_reading: Number(entry.odometer_reading),
+                        logged_at: endUsageForm.end_date,
+                      });
+                    }
+
+                    await resourceServices.vehicles.update(Number(vehicleId), { status: "Available" });
+                  }
+
                   setIsEndUsageOpen(false);
                   setEndUsageForm({ id: "", end_odometer: "", end_date: new Date().toISOString().slice(0,10) });
+                  setEndFuelEntries([emptyFuelEntry()]);
+                  setEndUsageContext(null);
                   await loadVehicles();
                   window.alert("Vehicle usage completed.");
                 } catch (saveError) {
@@ -1313,12 +1340,121 @@ export default function VehiclesPage() {
                 />
               </label>
 
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                <p className="font-semibold uppercase text-slate-700">Last session details</p>
+                <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                  <p>
+                    <span className="font-semibold text-slate-800">Started on:</span>{" "}
+                    {endUsageContext?.start_date || "-"}
+                  </p>
+                  <p>
+                    <span className="font-semibold text-slate-800">Start odometer:</span>{" "}
+                    {endUsageContext?.start_odometer ?? "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-semibold uppercase text-amber-900">Fuel Expenses</h3>
+                  <button
+                    type="button"
+                    onClick={() => setEndFuelEntries((current) => [...current, emptyFuelEntry()])}
+                    className="rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100"
+                  >
+                    + Add fuel stop
+                  </button>
+                </div>
+
+                <div className="mt-3 space-y-3">
+                  {endFuelEntries.map((entry, index) => (
+                    <div key={`fuel-entry-${index}`} className="rounded-md border border-amber-200 bg-white p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold uppercase text-slate-500">Fuel stop {index + 1}</p>
+                        {endFuelEntries.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => setEndFuelEntries((current) => current.filter((_, entryIndex) => entryIndex !== index))}
+                            className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100"
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600 uppercase">
+                          Gasoline Station
+                          <input
+                            value={entry.station_name}
+                            onChange={(ev) => setEndFuelEntries((current) => current.map((item, entryIndex) => entryIndex === index ? { ...item, station_name: ev.target.value } : item))}
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-[#800000]"
+                            placeholder="e.g. Shell, Caltex"
+                            required
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600 uppercase">
+                          Price Per Liter
+                          <input
+                            value={entry.price_per_liter}
+                            onChange={(ev) => setEndFuelEntries((current) => current.map((item, entryIndex) => entryIndex === index ? { ...item, price_per_liter: ev.target.value } : item))}
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-[#800000]"
+                            placeholder="e.g. 64.50"
+                            type="number"
+                            step="0.01"
+                            required
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600 uppercase">
+                          Liters
+                          <input
+                            value={entry.liters}
+                            onChange={(ev) => setEndFuelEntries((current) => current.map((item, entryIndex) => entryIndex === index ? { ...item, liters: ev.target.value } : item))}
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-[#800000]"
+                            placeholder="e.g. 25.5"
+                            type="number"
+                            step="0.01"
+                            required
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600 uppercase">
+                          Amount Spent
+                          <input
+                            value={entry.amount_spent}
+                            onChange={(ev) => setEndFuelEntries((current) => current.map((item, entryIndex) => entryIndex === index ? { ...item, amount_spent: ev.target.value } : item))}
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-[#800000]"
+                            placeholder="e.g. 1250.00"
+                            type="number"
+                            step="0.01"
+                            required
+                          />
+                        </label>
+                      </div>
+
+                      <label className="mt-3 flex flex-col gap-1 text-xs font-semibold text-slate-600 uppercase">
+                        Odometer Reading (Fuel Fill-up)
+                        <input
+                          value={entry.odometer_reading}
+                          onChange={(ev) => setEndFuelEntries((current) => current.map((item, entryIndex) => entryIndex === index ? { ...item, odometer_reading: ev.target.value } : item))}
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-[#800000]"
+                          placeholder="e.g. 12355.8"
+                          type="number"
+                          step="0.01"
+                          required
+                        />
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setIsEndUsageOpen(false);
                     setEndUsageForm({ id: "", end_odometer: "", end_date: new Date().toISOString().slice(0,10) });
+                    setEndFuelEntries([emptyFuelEntry()]);
                   }}
                   className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >

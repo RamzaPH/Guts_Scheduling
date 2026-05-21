@@ -2,7 +2,11 @@ const crypto = require("crypto");
 const path = require("path");
 const XLSX = require("xlsx");
 
-const ONLINE_TDC_SOURCES = new Set(["saferoads", "otdc"]);
+const ONLINE_TDC_SOURCES = new Set(["saferoads", "otdc", "odep", "saferoads_odep"]);
+
+function isSaferoadsLike(source) {
+  return source === "saferoads" || source === "odep" || source === "saferoads_odep";
+}
 
 /**
  * ONLINE TDC IMPORT SCHEMA HANDLING
@@ -289,7 +293,7 @@ function buildImportedLifecycle(lookup, source) {
     };
   }
 
-  if (normalizedSource === "saferoads") {
+  if (isSaferoadsLike(normalizedSource)) {
     const startedAt = parseImportedDate(
       pickValue(lookup, ["quizStartDate", "examStartDate", "startDate", "started_at", "startedDate"])
     );
@@ -318,7 +322,7 @@ function normalizeSource(source) {
 
 function getSourceLabel(source) {
   const normalized = normalizeSource(source);
-  if (normalized === "saferoads") return "SafeRoads.ph";
+  if (isSaferoadsLike(normalized)) return normalized === "odep" || normalized === "saferoads_odep" ? "SafeRoads (ODEP)" : "SafeRoads.ph";
   if (normalized === "otdc") return "OTDC.ph";
   return "Online TDC";
 }
@@ -391,14 +395,14 @@ function mapImportedOnlineTdcRow(row, source, index) {
   const firstName = normalizeText(
     pickValue(lookup, [
       "firstname", "first_name", "first name", "given_name", "givenname",
-      normalizedSource === "saferoads" ? "firstname" : null,
+      isSaferoadsLike(normalizedSource) ? "firstname" : null,
     ].filter(Boolean))
   );
 
   const lastName = normalizeText(
     pickValue(lookup, [
       "lastname", "last_name", "last name", "surname", "family_name", "familyname",
-      normalizedSource === "saferoads" ? "lastname" : null,
+      isSaferoadsLike(normalizedSource) ? "lastname" : null,
     ].filter(Boolean))
   );
 
@@ -414,14 +418,14 @@ function mapImportedOnlineTdcRow(row, source, index) {
   const middleName = normalizeText(
     pickValue(lookup, [
       "middle_name", "middlename", "middle name", "mi", "middle_initial",
-      normalizedSource === "saferoads" ? "middlename" : null
+      isSaferoadsLike(normalizedSource) ? "middlename" : null
     ].filter(Boolean))
   );
   
   const email = normalizeText(
     pickValue(lookup, [
       "email", "email_address", "gmail_account", "gmail", "mail",
-      normalizedSource === "saferoads" ? "email" : "email",
+      isSaferoadsLike(normalizedSource) ? "email" : "email",
       normalizedSource === "otdc" ? "email" : null
     ].filter(Boolean))
   );
@@ -429,7 +433,7 @@ function mapImportedOnlineTdcRow(row, source, index) {
   const phone = normalizeText(
     pickValue(lookup, [
       "phone", "mobile", "mobile_number", "contact_number", "contact", "cellphone",
-      normalizedSource === "saferoads" ? "mobile" : null
+      isSaferoadsLike(normalizedSource) ? "mobile" : null
     ].filter(Boolean))
   );
 
@@ -471,7 +475,7 @@ function mapImportedOnlineTdcRow(row, source, index) {
     motorcycle_type: normalizeText(pickValue(lookup, ["motorcycle_type", "motorcycle"])),
     
     // SafeRoads-specific fields
-    ...(normalizedSource === "saferoads" && {
+    ...(isSaferoadsLike(normalizedSource) && {
       saferoads_id: normalizeText(pickValue(lookup, ["id", "customId"])),
       driver_license_number: normalizeText(pickValue(lookup, ["driverLicense"])),
       lto_client_id: normalizeText(pickValue(lookup, ["ltoClientId"])),

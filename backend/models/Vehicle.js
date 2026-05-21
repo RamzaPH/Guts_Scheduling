@@ -30,7 +30,7 @@ module.exports = (sequelize) => {
 			allowNull: false,
 			defaultValue: "Available",
 			validate: {
-				isIn: [["Available", "In Service", "Maintenance", "Archived"]],
+				isIn: [["Available", "In use", "In Service", "Maintenance", "Archived"]],
 			},
 		},
 		created_at: {

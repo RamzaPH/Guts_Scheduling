@@ -117,6 +117,7 @@ export default function OnlineTdcImportModal({
               <option value="">Select a source...</option>
               <option value="saferoads">SafeRoads.ph</option>
               <option value="otdc">OTDC.ph</option>
+              <option value="odep">Saferoads (ODEP)</option>
             </select>
           </div>
 
@@ -166,7 +167,7 @@ export default function OnlineTdcImportModal({
 
           {/* Info Text */}
           <div className="mb-6 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2">
-            {source === "saferoads" ? (
+            {source === "saferoads" || source === "odep" ? (
               <>
                 <p className="text-xs text-blue-900">
                   <strong>SafeRoads.ph Export:</strong> firstName, lastName, email, mobile (required)

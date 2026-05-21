@@ -170,6 +170,9 @@ export function useStudentsPageLogic(options = {}) {
   } else if (view === "saferoads") {
     includeExternal = true;
     source = "saferoads";
+  } else if (view === "odep") {
+    includeExternal = true;
+    source = "saferoads";
   }
   const queryClient = useQueryClient();
 
