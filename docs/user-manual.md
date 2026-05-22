@@ -1,163 +1,219 @@
-# GUTS User Manual
+# GUTS User Manual (Updated)
 
-This guide is for end users of the GUTS system. It covers the main screens, typical tasks, and a few common issues.
+This manual covers typical end-user and administrator workflows for the GUTS system, plus brief guidance for operators and support staff.
 
-## 1. What the system is for
+If you need an on-site walkthrough, contact your system administrator and request the demo account or a recorded session.
 
-GUTS is used to manage school operations such as:
+--
 
-- student records
-- enrollments
-- reports and summaries
-- notifications
-- settings for instructors, vehicles, promo offers, and users
+## Quick overview
 
-Access is role-based, so the pages you can see depend on whether you are an admin, sub-admin, or staff member.
+- Purpose: manage school operations — students, enrollments, payments, instructors, vehicles, promos, and reports.
+- Access: role-based (Admin, Sub-admin, Staff). Your visible pages and actions depend on your role.
 
-## 2. Signing in
+## 1. Roles & access
 
-1. Open the system in your browser.
-2. Go to the login page.
-3. Enter your email and password.
-4. If your account was seeded or temporary, change your password when prompted or as soon as possible.
+- Admin: full access to settings, user management, backups, and reports.
+- Sub-admin: limited admin tasks (depends on role assignments).
+- Staff: daily workflows — enrollments, student records, and basic reporting.
 
-If sign-in fails, confirm that you are using the correct email, password, and that your account has not been disabled.
+If you need additional access, request it from an Admin and explain why.
 
-## 3. Dashboard
+## 2. Getting started
 
-After sign-in, most users land on the dashboard. This is the main overview screen and may show:
+1. Open the application URL in a modern browser (Chrome/Edge/Firefox recommended).
+2. Sign in using your corporate or assigned account.
+3. If prompted to change a temporary password, do so immediately.
 
-- summary cards
-- recent activities
-- pending approvals
-- calendar or schedule widgets
-- daily or monthly reports
-- quick actions
+Tip: Save the application URL as a bookmark and do not share your password.
 
-Use this page to check what needs attention first.
+## 3. Navigating the app
 
-## 4. Enrollments
+- Top navigation: primary areas (Dashboard, Students, Enrollments, Reports, Settings).
+- Left sidebar: contextual links and quick filters (role-dependent).
+- Global search: find students, enrollments, or invoices quickly.
 
-The enrollments area is where you manage student enrollment records.
+## 4. Dashboard (first view)
 
-Common tasks include:
+The dashboard provides an at-a-glance summary:
+- Pending approvals and enrollments
+- Recent activity feed
+- Summary cards (counts, payments, schedules)
+- Quick actions (create enrollment, new student)
 
-- creating a new enrollment
-- reviewing pending enrollments
-- checking payment-related enrollment records
-- scheduling later sessions when needed
+Use dashboard cards to jump to the related page for details.
 
-If you are working with QR-based enrollment flows, there are also dedicated pages for pending QR enrollments and QR payment handling.
+## 5. Managing Enrollments (step-by-step)
 
-## 5. Students
+Creating a new enrollment:
 
-The students page is used to review and maintain student records.
+1. Go to Enrollments > New Enrollment.
+2. Search or create a Student record.
+3. Select package, schedule, and any promos.
+4. Capture payment or select pending payment status.
+5. Save. Confirm enrollment appears in the Pending list (if applicable).
 
-Typical actions:
+Approving / reviewing enrollments:
 
-- search or filter the student list
-- open student details
-- edit student information
-- update status
-- view related enrollment and payment information
+- Open Enrollments > Pending.
+- Review details, payment status, and attached documents.
+- Approve or request changes — use the comments field for context.
 
-Some tables and cards on this page may change based on the current browser size or zoom level.
+QR-based enrollments:
 
-## 6. Reports
+- Scan the QR from the applicant's phone, or import pending QR enrollments from the pending QR queue.
+- Verify payment if the flow requires it, then finalize the enrollment.
 
-Reports are used for monitoring school activity and printing or exporting summaries.
+## 6. Student records
 
-You may find:
+Common actions:
+- Open Students > Search and filter the list.
+- Click a student's name to open the profile.
+- Edit contact info, emergency contacts, medical notes, and enrollment history.
+- Use activity/timeline to review interactions and payments.
 
-- report overview pages
-- daily or monthly summaries
-- printable report layouts
-- export or email actions when enabled
+Note: Deleting student records is restricted. If needed, contact an Admin.
 
-If you only need a quick view, use the overview report pages first.
+## 7. Payments & Invoices
 
-## 7. Notifications
+- Payments can be captured during enrollment or recorded later.
+- Invoices are generated for paid packages and can be exported/printed.
+- Refunds and adjustments require Admin permissions.
 
-The notification bell shows recent system activity and alerts.
+If a payment fails to appear, check the enrollment's payment tab and the pending payments queue.
 
-Use it to:
+## 8. Reports and exports
 
-- check new enrollment or approval updates
-- jump to the related page
-- mark notifications as read
+- Use Reports > Overview for daily and monthly summaries.
+- Export CSV or PDF for external processing or printing.
+- Scheduling reports: Admins can configure scheduled exports in Settings.
 
-The notification stream is shared across roles, so it is best used as an activity feed rather than a private inbox.
+## 9. Notifications and activity feed
 
-## 8. Settings
+- The bell icon shows system notifications and quick links to items requiring action.
+- Click a notification to jump to the related screen.
+- Mark notifications as read when addressed.
 
-The settings area is for administrative maintenance tasks.
+## 10. Settings (Admin area)
 
-Depending on your role, you may be able to manage:
+Admin capabilities include:
+- User and role management
+- Instructors and vehicles management
+- Promo offers and pricing
+- System options (email templates, calendar defaults)
+- Backup and restore (see Admin operations)
 
-- instructors
-- vehicles
-- promo offers
-- users and roles
+Changes to settings may take effect immediately; coordinate major changes with other Admins.
 
-If a page is hidden or you are redirected away from it, your account likely does not have permission for that section.
+## 11. QR enrollment flow (summary)
 
-## 9. Passwords and account safety
+1. Applicant opens the public QR link and completes the form.
+2. The application creates a pending QR enrollment record.
+3. Staff review pending QR enrollments and confirm payment status.
+4. Finalize enrollment into the system and notify the applicant.
 
-If you are using a default or seeded account, change the password immediately.
+If you see many pending QR enrollments, check payment gateway connectivity or queued jobs.
 
-Recommended password rules:
+## 12. Admin operations (backups, restores, deployments)
 
-- at least 10 characters
-- upper-case and lower-case letters
-- at least one number
-- at least one symbol
+Backups:
+- Backups are stored in `backups/` and follow a timestamped naming convention.
+- Admins should verify backups after automated runs and before major upgrades.
 
-If you are locked out, ask an admin to verify your account status and credentials.
+Restore:
+- Restores are sensitive and should be performed during maintenance windows.
+- Contact the technical lead for help; provide the backup filename and target environment.
 
-## 10. Common issues
+Deployments:
+- The system runs in Docker Compose in production; see `docker-compose.yml` and `docker-compose.prod.yml`.
+- For self-hosted or local development, follow the `README.md` at the repository root.
 
-### The page shows an authorization or login error
+## 13. Running locally (dev notes for power users)
 
-- Sign out and sign in again.
-- Make sure you are using the correct account.
-- If this happens after a server restart, clear the old session and log in again.
+This is a quick guide; use only if you are comfortable with Docker and Node.js.
 
-### A page opens but looks incomplete
+1. Clone the repository and copy the `.env` template.
+2. Install dependencies: `npm install` in `backend/` and `frontend/`.
+3. Start services: `docker-compose up --build` (or use provided scripts).
 
-- Refresh the page.
-- Try a normal browser zoom level.
-- Check whether the problem happens in another browser.
+Environment files and keys are in the repository root and `backend/config` — do not commit secrets.
 
-### A menu item is missing
+## 14. Troubleshooting (common issues)
 
-- Your role may not have access to that page.
-- Ask an admin to verify your permissions.
+- Can't sign in:
+	- Confirm email/password and account active status.
+	- Ask an Admin to check user record if needed.
+- Missing menu items:
+	- Verify role permissions.
+- Page looks incomplete or data missing:
+	- Refresh, clear browser cache, or try another browser.
+- Payments not visible:
+	- Check the pending payments queue and the enrollment's payment tab.
 
-### A record is not visible yet
+When in doubt, collect screenshots, the affected user account, timestamp, and a short description before escalating.
 
-- Check the relevant filters.
-- Confirm the record was saved successfully.
-- If needed, reload the list or re-open the page.
+## 15. Support and contacts
 
-## 11. For admins
+- First-line support: your local Admin or IT contact.
+- Technical support / developer contact: see the internal `README.md` or reach out to the on-call engineer.
 
-Admins usually handle the heavier operational tasks:
+Include environment (production/staging), account email, and exact error messages when reporting issues.
 
-- managing users and roles
-- reviewing reports
-- maintaining instructors, vehicles, and promo offers
-- monitoring pending enrollments and system notifications
+## 16. Appendices
 
-If you are preparing for a demo or handover, keep a list of active accounts, important credentials, and role assignments.
+- Glossary: Student, Enrollment, Invoice, Promo, Instructor, Vehicle.
+- File locations of interest:
+	- [repo root README](../README.md)
+	- Backups: `backups/`
+	- Environment: `.env` (root)
 
-## 12. Where to start if you are new
+## 17. Screenshots — where to capture and what to include
 
-If you are learning the system for the first time, use this order:
+Add screenshots to help users follow the UI. Store images under `docs/images/screenshots/` using descriptive filenames.
 
-1. Log in.
-2. Review the dashboard.
-3. Open students and enrollments.
-4. Check notifications.
-5. Visit reports when you need summaries.
+Suggested screenshots to capture (file name suggestions):
 
-That is usually enough to understand the daily workflow.
+- Login page — `login.png` — show email/password fields and an example error state.
+- Dashboard — `dashboard.png` — full dashboard view including summary cards and activity feed.
+- New enrollment flow (multi-step):
+	- `enrollment-step1-student.png` — student search / create screen.
+	- `enrollment-step2-package.png` — package/schedule selection screen.
+	- `enrollment-step3-payment.png` — payment capture / confirmation screen.
+- Pending enrollments list — `pending-enrollments.png` — filters and status columns visible.
+- QR pending queue — `qr-pending.png` — example QR enrollment record and payment flag.
+- Student profile — `student-profile.png` — contact, emergency contacts, and enrollment history.
+- Payment / Invoice view — `payment-invoice.png` — invoice layout with payment status.
+- Reports export modal — `reports-export.png` — export options and sample output preview.
+- Notifications dropdown — `notifications.png` — sample notification and action link.
+- Settings: Users & Roles — `settings-users-roles.png` — role assignment UI.
+- Backups list — `backups-list.png` — backup filenames and restore button.
+- Common error example — `error-authorization.png` — authorization/login error or incomplete page state.
+
+For each screenshot include a short caption and any redaction/annotation needed (hide personal data). Recommended image format: PNG. Use the filename convention `YYYYMMDD-section-desc.png` when practical.
+
+Where to place screenshots in this manual (placeholders):
+
+- After **Getting started** (`## 2. Getting started`) — add `login.png`.
+- After **Dashboard (first view)** (`## 4. Dashboard`) — add `dashboard.png`.
+- Inline in **Managing Enrollments** (`## 5. Managing Enrollments`) — add the three `enrollment-step*.png` images next to each step.
+- After **Student records** (`## 6. Student records`) — add `student-profile.png`.
+- After **Payments & Invoices** (`## 7. Payments & Invoices`) — add `payment-invoice.png`.
+- After **Reports and exports** (`## 8. Reports and exports`) — add `reports-export.png`.
+- After **Notifications and activity feed** (`## 9. Notifications and activity feed`) — add `notifications.png`.
+- After **Settings (Admin area)** (`## 10. Settings`) — add `settings-users-roles.png`.
+- After **Admin operations** (`## 12. Admin operations`) — add `backups-list.png`.
+- In **Troubleshooting** (`## 14. Troubleshooting`) — add `error-authorization.png` as an example.
+
+Placeholder markup examples (copy into the document where appropriate):
+
+![Login screen placeholder](images/screenshots/login.png)  
+*Screenshot: Login screen — replace with actual image.*
+
+If you want, I can create the `docs/images/screenshots/` folder and add placeholder image files (empty PNGs) with the suggested filenames. Tell me if you want me to generate those placeholders now.
+
+## 18. Change log
+
+- 2026-05-22: Updated manual to include expanded workflows, admin operations, troubleshooting, and screenshot guidance.
+--
+
+If you want this translated into Filipino, or prefer a short quickstart for staff only, tell me which sections to prioritize and I will produce a revised version.

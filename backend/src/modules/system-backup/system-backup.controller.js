@@ -31,7 +31,29 @@ async function getStatus(req, res) {
   }
 }
 
+async function restoreLatest(req, res) {
+  try {
+    const payload = await service.restoreBackup({
+      backupFileName: req.body?.backupFileName || null,
+      triggeredByUserId: req.user?.id || null,
+    });
+
+    await recordActivity({
+      userId: req.user?.id,
+      action: `Triggered backup restore (${payload.restoredBackupFileName || "backup"})`,
+    });
+
+    return res.status(200).json({
+      message: "Backup restored successfully",
+      ...payload,
+    });
+  } catch (error) {
+    return sendHttpError(res, error, 500, "Failed to restore backup");
+  }
+}
+
 module.exports = {
   runManual,
   getStatus,
+  restoreLatest,
 };

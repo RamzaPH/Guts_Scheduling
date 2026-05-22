@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Database, LoaderCircle, Trash2, UserCog, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertTriangle, Database, LoaderCircle, RotateCcw, Trash2, UserCog, X } from "lucide-react";
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "../../users/hooks/useUsers";
 import { useAuth } from "../../auth/hooks/useAuth";
 import { api } from "../../../services/api";
@@ -43,12 +43,30 @@ export default function ManageUsersPage() {
   const [editError, setEditError] = useState("");
   const [toastMsg, setToastMsg] = useState("");
   const [isBackupRunning, setIsBackupRunning] = useState(false);
+  const [showBackupModal, setShowBackupModal] = useState(false);
+  const [backupState, setBackupState] = useState("idle");
+  const [backupError, setBackupError] = useState("");
   const [backupStepIndex, setBackupStepIndex] = useState(0);
   const [backupElapsedMs, setBackupElapsedMs] = useState(0);
+  const [backupResultMessage, setBackupResultMessage] = useState("");
   const [backupStatus, setBackupStatus] = useState(null);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [restoreSelection, setRestoreSelection] = useState("");
+  const [restoreConfirmText, setRestoreConfirmText] = useState("");
+  const [isRestoreRunning, setIsRestoreRunning] = useState(false);
+  const [restoreStepIndex, setRestoreStepIndex] = useState(0);
+  const [restoreElapsedMs, setRestoreElapsedMs] = useState(0);
+  const [restoreError, setRestoreError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
   const backupTimerRef = useRef(null);
+  const restoreTimerRef = useRef(null);
+
+  const availableBackupFiles = backupStatus?.backups?.length
+    ? backupStatus.backups
+    : backupStatus?.latestBackup
+      ? [backupStatus.latestBackup]
+      : [];
 
   const backupSteps = [
     "Preparing backup request",
@@ -57,12 +75,19 @@ export default function ManageUsersPage() {
     "Finalizing status and cleanup",
   ];
 
+  const restoreSteps = [
+    "Validating backup selection",
+    "Preparing database restore",
+    "Importing backup file",
+    "Finalizing restore",
+  ];
+
   function toast(msg) {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 3000);
   }
 
-  async function loadBackupStatus() {
+  const loadBackupStatus = useCallback(async () => {
     try {
       const payload = await api.get("/backups/status");
       setBackupStatus(payload);
@@ -71,13 +96,27 @@ export default function ManageUsersPage() {
       setBackupStatus(null);
       return null;
     }
-  }
+  }, []);
 
   useEffect(() => {
     Promise.resolve().then(() => {
       void loadBackupStatus();
     });
-  }, []);
+  }, [loadBackupStatus]);
+
+  useEffect(() => {
+    if (!showBackupModal && !showRestoreModal) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      void loadBackupStatus();
+    }, 3000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [showBackupModal, showRestoreModal, loadBackupStatus]);
 
   const createUser = useCreateUser({
     onSuccess: () => { setShowModal(false); setForm(EMPTY_FORM); toast("User created successfully."); },
@@ -147,6 +186,10 @@ export default function ManageUsersPage() {
     const startedAt = Date.now();
     setBackupStepIndex(0);
     setBackupElapsedMs(0);
+    setBackupResultMessage("");
+    setBackupError("");
+    setBackupState("processing");
+    setShowBackupModal(true);
 
     if (backupTimerRef.current) {
       clearInterval(backupTimerRef.current);
@@ -160,16 +203,25 @@ export default function ManageUsersPage() {
       }, 1200);
 
       const payload = await api.post("/backups/run", {});
-      toast(`Backup complete: ${payload.backupFileName || "database backup created"}`);
+      const successMessage = `Backup complete: ${payload.backupFileName || "database backup created"}`;
+      setBackupResultMessage(successMessage);
+      setBackupState("success");
+      toast(successMessage);
       await loadBackupStatus();
     } catch (error) {
       // Some environments return a non-2xx response even when the backup completes.
       // Refresh status and show success if the status file reports success.
       const statusPayload = await loadBackupStatus();
       if (statusPayload?.status?.status === "success") {
-        toast(`Backup complete: ${statusPayload.status.backupFileName || "database backup created"}`);
+        const successMessage = `Backup complete: ${statusPayload.status.backupFileName || "database backup created"}`;
+        setBackupResultMessage(successMessage);
+        setBackupState("success");
+        toast(successMessage);
       } else {
-        toast(`Backup failed: ${error?.message || "Request failed"}`);
+        const failedMessage = error?.message || "Request failed";
+        setBackupError(failedMessage);
+        setBackupState("failed");
+        toast(`Backup failed: ${failedMessage}`);
       }
     } finally {
       if (backupTimerRef.current) {
@@ -178,6 +230,69 @@ export default function ManageUsersPage() {
       }
       setBackupElapsedMs(Date.now() - startedAt);
       setIsBackupRunning(false);
+    }
+  }
+
+  function closeBackupModal() {
+    if (isBackupRunning) {
+      return;
+    }
+    setShowBackupModal(false);
+    setBackupState("idle");
+    setBackupError("");
+    setBackupResultMessage("");
+  }
+
+  function openRestoreModal() {
+    const latestBackupName = availableBackupFiles[0]?.name || "";
+    if (!latestBackupName) {
+      toast("No backup file available to restore.");
+      return;
+    }
+
+    setRestoreError("");
+    setRestoreSelection(latestBackupName);
+    setRestoreConfirmText("");
+    setShowRestoreModal(true);
+  }
+
+  async function handleRunRestore() {
+    if (!restoreSelection) {
+      setRestoreError("Select a backup file to restore.");
+      return;
+    }
+
+    const startedAt = Date.now();
+    setRestoreStepIndex(0);
+    setRestoreElapsedMs(0);
+    setRestoreError("");
+
+    if (restoreTimerRef.current) {
+      clearInterval(restoreTimerRef.current);
+    }
+
+    try {
+      setIsRestoreRunning(true);
+      restoreTimerRef.current = setInterval(() => {
+        setRestoreElapsedMs(Date.now() - startedAt);
+        setRestoreStepIndex((current) => Math.min(current + 1, restoreSteps.length - 1));
+      }, 1200);
+
+      const payload = await api.post("/backups/restore", { backupFileName: restoreSelection });
+      toast(`Restore complete: ${payload.restoredBackupFileName || restoreSelection}`);
+      setShowRestoreModal(false);
+      setRestoreConfirmText("");
+      await loadBackupStatus();
+    } catch (error) {
+      toast(`Restore failed: ${error?.message || "Request failed"}`);
+      setRestoreError(error?.message || "Failed to restore backup.");
+    } finally {
+      if (restoreTimerRef.current) {
+        clearInterval(restoreTimerRef.current);
+        restoreTimerRef.current = null;
+      }
+      setRestoreElapsedMs(Date.now() - startedAt);
+      setIsRestoreRunning(false);
     }
   }
 
@@ -195,9 +310,119 @@ export default function ManageUsersPage() {
     return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
   }
 
+  function formatFileSize(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return "-";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function formatBackupOption(backup) {
+    if (!backup) return "";
+    const parts = [backup.name];
+    if (backup.modifiedAt) {
+      parts.push(new Date(backup.modifiedAt).toLocaleString());
+    }
+    if (Number.isFinite(backup.sizeBytes)) {
+      parts.push(formatFileSize(backup.sizeBytes));
+    }
+    return parts.join(" • ");
+  }
+
   return (
     <section className="space-y-4">
-      {isBackupRunning && (
+      {showBackupModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                {backupState === "success" ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                ) : backupState === "failed" ? (
+                  <AlertTriangle className="h-6 w-6" />
+                ) : (
+                  <LoaderCircle className="h-6 w-6 animate-spin" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1 space-y-3">
+                {backupState === "success" ? (
+                  <>
+                    <h2 className="text-lg font-bold text-emerald-700">Backup complete</h2>
+                    <p className="text-sm text-slate-600">{backupResultMessage}</p>
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                      Backup finished successfully. You can close this dialog when ready.
+                    </div>
+                  </>
+                ) : backupState === "failed" ? (
+                  <>
+                    <h2 className="text-lg font-bold text-red-700">Backup failed</h2>
+                    <p className="text-sm text-slate-600">{backupError || "Backup request did not complete."}</p>
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      Review server logs or retry the backup action.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-lg font-bold text-slate-900">Backup in progress</h2>
+                    <p className="text-sm text-slate-600">
+                      The database backup is running now. Please wait until it finishes before doing anything else on this page.
+                    </p>
+                    <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>
+                        Do not refresh, close, or cancel this action. Interrupting a backup can leave incomplete files behind.
+                      </span>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <span>Current process</span>
+                        <span>{formatElapsed(backupElapsedMs)}</span>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {backupSteps.map((step, index) => {
+                          const isActive = index === backupStepIndex;
+                          const isComplete = index < backupStepIndex;
+                          return (
+                            <div
+                              key={step}
+                              className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition ${
+                                isActive
+                                  ? "border-[#800000]/30 bg-[#800000]/5 text-[#800000]"
+                                  : isComplete
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : "border-slate-200 bg-white text-slate-500"
+                              }`}
+                            >
+                              <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${isActive ? "bg-[#800000] text-white" : isComplete ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"}`}>
+                                {isComplete ? "✓" : index + 1}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate">{step}</span>
+                              {isActive && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+                {backupState !== "processing" && (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={closeBackupModal}
+                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isRestoreRunning && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
           <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-white p-6 shadow-2xl">
             <div className="flex items-start gap-4">
@@ -205,25 +430,25 @@ export default function ManageUsersPage() {
                 <LoaderCircle className="h-6 w-6 animate-spin" />
               </div>
               <div className="min-w-0 flex-1 space-y-3">
-                <h2 className="text-lg font-bold text-slate-900">Backup in progress</h2>
+                <h2 className="text-lg font-bold text-slate-900">Restore in progress</h2>
                 <p className="text-sm text-slate-600">
-                  The database backup is running now. Please wait until it finishes before doing anything else on this page.
+                  The selected backup is being imported. Do not refresh, close, or use the database while this runs.
                 </p>
                 <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>
-                    Do not refresh, close, or cancel this action. Interrupting a backup can leave incomplete files behind.
+                    Restoring a backup overwrites the current database contents.
                   </span>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <div className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <span>Current process</span>
-                    <span>{formatElapsed(backupElapsedMs)}</span>
+                    <span>{formatElapsed(restoreElapsedMs)}</span>
                   </div>
                   <div className="mt-3 space-y-2">
-                    {backupSteps.map((step, index) => {
-                      const isActive = index === backupStepIndex;
-                      const isComplete = index < backupStepIndex;
+                    {restoreSteps.map((step, index) => {
+                      const isActive = index === restoreStepIndex;
+                      const isComplete = index < restoreStepIndex;
                       return (
                         <div
                           key={step}
@@ -266,7 +491,7 @@ export default function ManageUsersPage() {
           <button
             type="button"
             onClick={() => void handleRunBackup()}
-            disabled={isBackupRunning}
+            disabled={isBackupRunning || isRestoreRunning}
             aria-busy={isBackupRunning}
             className="inline-flex items-center gap-2 rounded-lg border border-[#800000]/30 bg-white px-4 py-2 text-sm font-semibold text-[#800000] transition hover:bg-[#800000]/5 disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -276,7 +501,18 @@ export default function ManageUsersPage() {
 
           <button
             type="button"
+            onClick={openRestoreModal}
+            disabled={isBackupRunning || isRestoreRunning || !backupStatus?.latestBackup}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RotateCcw size={14} />
+            Restore Backup
+          </button>
+
+          <button
+            type="button"
             onClick={() => { setShowModal(true); setForm(EMPTY_FORM); setFormError(""); }}
+            disabled={isBackupRunning || isRestoreRunning}
             className="rounded-lg bg-[#800000] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#6d1224]"
           >
             + Add User
@@ -296,6 +532,95 @@ export default function ManageUsersPage() {
           </p>
         </div>
       ) : null}
+
+      {showRestoreModal && (
+        <div
+          style={{ left: "var(--app-sidebar-width, 0px)", width: "calc(100vw - var(--app-sidebar-width, 0px))" }}
+          className="fixed inset-y-0 right-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <div className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between bg-amber-600 px-6 py-4">
+              <h2 className="text-base font-semibold text-white">Restore Backup</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRestoreModal(false);
+                  setRestoreError("");
+                  setRestoreConfirmText("");
+                }}
+                className="text-white/70 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-4 p-6">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Restoring will overwrite the current database contents with the selected backup.
+              </div>
+              {restoreError ? (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{restoreError}</p>
+              ) : null}
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600">Select backup file</label>
+                <select
+                  value={restoreSelection}
+                  onChange={(e) => setRestoreSelection(e.target.value)}
+                  className={inputClass}
+                >
+                  {availableBackupFiles.length > 0 ? (
+                    availableBackupFiles.map((backup) => (
+                      <option key={backup.name} value={backup.name}>
+                        {formatBackupOption(backup)}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No backup files found</option>
+                  )}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">
+                  {availableBackupFiles.length} backup file(s) available. Latest file is selected by default.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600">
+                  Type RESTORE to confirm
+                </label>
+                <input
+                  type="text"
+                  value={restoreConfirmText}
+                  onChange={(e) => setRestoreConfirmText(e.target.value)}
+                  placeholder="RESTORE"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRestoreModal(false);
+                    setRestoreError("");
+                    setRestoreConfirmText("");
+                  }}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isRestoreRunning || !restoreSelection || restoreConfirmText.trim().toUpperCase() !== "RESTORE"}
+                  onClick={() => void handleRunRestore()}
+                  className="rounded-lg bg-amber-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-60"
+                >
+                  {isRestoreRunning ? "Restoring…" : "Restore Now"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">

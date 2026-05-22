@@ -42,6 +42,57 @@ function listBackupFiles(backupDir) {
     .sort((a, b) => b.modifiedAtMs - a.modifiedAtMs);
 }
 
+function getBackupDir() {
+  return path.resolve(process.env.BACKUP_DIR || "./backups");
+}
+
+function getLatestBackupFile(backupDir) {
+  const backups = listBackupFiles(backupDir);
+  return backups[0] || null;
+}
+
+function resolveBackupFile(backupDir, backupFileName) {
+  const backups = listBackupFiles(backupDir);
+  if (!backupFileName) {
+    return backups[0] || null;
+  }
+
+  const match = backups.find((backup) => backup.name === backupFileName);
+  return match || null;
+}
+
+function runMysqlImport({ backupFilePath, dbHost, dbUser, dbPassword, dbName, mysqlCommand = "mysql" }) {
+  const args = [`--host=${dbHost}`, `--user=${dbUser}`, dbName];
+
+  return new Promise((resolve, reject) => {
+    const importProcess = spawn(mysqlCommand, args, {
+      env: {
+        ...process.env,
+        MYSQL_PWD: dbPassword,
+      },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let stderr = "";
+
+    importProcess.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    importProcess.on("error", (error) => reject(error));
+    importProcess.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(new Error(`${mysqlCommand} exited with code ${code}. ${stderr}`));
+    });
+
+    fs.createReadStream(backupFilePath).pipe(importProcess.stdin);
+  });
+}
+
 function cleanupOldBackups(backupDir, retentionDays) {
   const entries = fs.readdirSync(backupDir, { withFileTypes: true });
   const now = Date.now();
@@ -94,7 +145,7 @@ async function runManualBackup({ triggeredByUserId = null } = {}) {
   const dumpExtraArgs = (process.env.MYSQL_DUMP_EXTRA_ARGS || "")
     .split(/\s+/)
     .filter(Boolean);
-  const backupDir = path.resolve(process.env.BACKUP_DIR || "./backups");
+  const backupDir = getBackupDir();
   const retentionDays = Number(process.env.BACKUP_RETENTION_DAYS || 14);
 
   fs.mkdirSync(backupDir, { recursive: true });
@@ -176,7 +227,7 @@ async function runManualBackup({ triggeredByUserId = null } = {}) {
 }
 
 function getBackupStatus() {
-  const backupDir = path.resolve(process.env.BACKUP_DIR || "./backups");
+  const backupDir = getBackupDir();
   const statusPath = path.join(backupDir, "backup-status.json");
 
   const result = {
@@ -203,14 +254,64 @@ function getBackupStatus() {
   }
 
   const backups = listBackupFiles(backupDir);
-  if (backups.length > 0) {
-    result.latestBackup = backups[0];
-  }
+  result.backups = backups;
+  result.latestBackup = getLatestBackupFile(backupDir);
 
   return result;
+}
+
+async function restoreBackup({ backupFileName = null, triggeredByUserId = null } = {}) {
+  const startedAt = new Date();
+  const dbName = assertRequiredEnv("DB_NAME");
+  const dbUser = assertRequiredEnv("DB_USER");
+  const dbPassword = assertRequiredEnv("DB_PASSWORD");
+  const dbHost = process.env.DB_HOST || "db";
+  const mysqlCommand = process.env.MYSQL_COMMAND || "mysql";
+  const backupDir = getBackupDir();
+
+  if (!fs.existsSync(backupDir)) {
+    const error = new Error(`Backup directory not found: ${backupDir}`);
+    error.status = 404;
+    throw error;
+  }
+
+  const selectedBackup = resolveBackupFile(backupDir, backupFileName);
+  if (!selectedBackup) {
+    const error = new Error(backupFileName ? `Backup file not found: ${backupFileName}` : "No backup files found to restore");
+    error.status = 404;
+    throw error;
+  }
+
+  try {
+    await runMysqlImport({
+      backupFilePath: selectedBackup.filePath,
+      dbHost,
+      dbUser,
+      dbPassword,
+      dbName,
+      mysqlCommand,
+    });
+
+    return {
+      status: "success",
+      timestamp: new Date().toISOString(),
+      startedAt: startedAt.toISOString(),
+      restoredBackupFile: selectedBackup.filePath,
+      restoredBackupFileName: selectedBackup.name,
+      database: dbName,
+      host: dbHost,
+      triggeredByUserId,
+      mode: "restore",
+    };
+  } catch (error) {
+    const wrapped = new Error(`Restore failed: ${error.message}`);
+    wrapped.status = 500;
+    throw wrapped;
+  }
 }
 
 module.exports = {
   runManualBackup,
   getBackupStatus,
+  restoreBackup,
 };

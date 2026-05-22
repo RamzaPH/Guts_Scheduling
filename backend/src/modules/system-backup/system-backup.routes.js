@@ -9,5 +9,6 @@ router.use(authorizeRoles("admin"));
 
 router.get("/status", controller.getStatus);
 router.post("/run", controller.runManual);
+router.post("/restore", controller.restoreLatest);
 
 module.exports = router;
