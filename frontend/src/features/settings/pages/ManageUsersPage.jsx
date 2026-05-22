@@ -482,18 +482,18 @@ export default function ManageUsersPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between rounded-xl bg-white px-6 py-4 shadow-sm">
-        <div>
+      <div className="flex flex-col gap-4 rounded-xl bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-slate-900">User Management</h1>
           <p className="mt-0.5 text-sm text-slate-500">Manage admin and staff accounts.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
           <button
             type="button"
             onClick={() => void handleRunBackup()}
             disabled={isBackupRunning || isRestoreRunning}
             aria-busy={isBackupRunning}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#800000]/30 bg-white px-4 py-2 text-sm font-semibold text-[#800000] transition hover:bg-[#800000]/5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#800000]/30 bg-white px-4 py-2 text-sm font-semibold text-[#800000] transition hover:bg-[#800000]/5 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {isBackupRunning ? <LoaderCircle size={14} className="animate-spin" /> : <Database size={14} />}
             {isBackupRunning ? "Backup Running..." : "Backup Now"}
@@ -503,7 +503,7 @@ export default function ManageUsersPage() {
             type="button"
             onClick={openRestoreModal}
             disabled={isBackupRunning || isRestoreRunning || !backupStatus?.latestBackup}
-            className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             <RotateCcw size={14} />
             Restore Backup
@@ -513,7 +513,7 @@ export default function ManageUsersPage() {
             type="button"
             onClick={() => { setShowModal(true); setForm(EMPTY_FORM); setFormError(""); }}
             disabled={isBackupRunning || isRestoreRunning}
-            className="rounded-lg bg-[#800000] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#6d1224]"
+            className="rounded-lg bg-[#800000] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#6d1224] sm:w-auto"
           >
             + Add User
           </button>
@@ -622,8 +622,8 @@ export default function ManageUsersPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <table className="min-w-[720px] w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-5 py-3">Name</th>

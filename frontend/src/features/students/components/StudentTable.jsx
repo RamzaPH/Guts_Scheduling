@@ -132,9 +132,183 @@ export default function StudentTable({
   sortBy,
   onToggleSort,
 }) {
+  const renderMobileActions = (student) => (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={() => onView(student)}
+        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+      >
+        <Eye size={14} className="text-[#800000]" />
+        View
+      </button>
+      <button
+        type="button"
+        onClick={() => onEdit(student)}
+        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+      >
+        <Pencil size={14} className="text-[#8d6f12]" />
+        Edit
+      </button>
+      <button
+        type="button"
+        onClick={() => onUpdateStatus(student)}
+        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+      >
+        <Clock size={14} className="text-[#800000]" />
+        Update
+      </button>
+      {canDelete ? (
+        <button
+          type="button"
+          onClick={() => onDelete(student)}
+          className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+        >
+          <Trash2 size={14} className="text-rose-600" />
+          Delete
+        </button>
+      ) : null}
+    </div>
+  );
+
   return (
     <div className="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm">
-      <div className="thin-scrollbar overflow-auto max-h-[440px]">
+      <div className="md:hidden space-y-3 px-3 py-3">
+        {isLoading ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+            Loading students...
+          </div>
+        ) : null}
+
+        {!isLoading && isError ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-8 text-center text-sm text-rose-700">
+            {error?.message || "Failed to load students"}
+          </div>
+        ) : null}
+
+        {!isLoading && !isError && students.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+            No students found for the selected filters.
+          </div>
+        ) : null}
+
+        {!isLoading && !isError
+          ? students.map((student) => {
+              const latestEnrollment = getLatestEnrollment(student);
+              const enrollmentStatus = getEnrollmentLifecycleStatus(latestEnrollment, student);
+              const paymentSummary = getEnrollmentPaymentSummary(latestEnrollment, student);
+              const paymentCategory = getPaymentCategoryLabel(latestEnrollment);
+              const latestSchedule = getLatestScheduleForEnrollment(latestEnrollment);
+              const course = getCourseCode(student);
+              const isPromo = course === "PROMO";
+              const fullName = getStudentFullName(student);
+              const sourceLabel = getStudentSourceLabel(student);
+              const isImportedOnlineTdc = sourceLabel !== "Walk-in";
+              const timelineDates = getEnrollmentTimelineDates(latestEnrollment, student);
+              const statusLabel = !latestEnrollment && isImportedOnlineTdc
+                ? "Imported"
+                : getDisplayStatusLabel(course, latestEnrollment?.score, enrollmentStatus, {
+                    isImportedTdc: isImportedOnlineTdc && course === "TDC",
+                  });
+              const statusTone = !latestEnrollment && isImportedOnlineTdc ? "slate" : getStatusTone(statusLabel);
+
+              return (
+                <div
+                  key={student.id}
+                  className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${selectedStudentIds.includes(student.id) ? "ring-2 ring-[#800000]/20" : ""}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedStudentIds.includes(student.id)}
+                      onChange={() => onToggleSelectStudent(student.id)}
+                      aria-label={`Select student ${fullName || student.id}`}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-[#800000] focus:ring-[#800000]/30"
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {fullName || "N/A"}
+                          </p>
+                          <p className="text-xs text-slate-500">ID #{student.id}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {isPromo ? <Badge label="Promo" tone="maroon" /> : null}
+                          {isImportedOnlineTdc ? <Badge label="Online TDC" tone="slate" /> : null}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600">
+                        <div>
+                          <p className="font-semibold text-slate-500">Contact</p>
+                          <p className="mt-0.5 break-words">{student.email || "N/A"}</p>
+                          <p className="mt-0.5 break-words text-slate-500">{student.phone || "No phone"}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge label={course} tone={isImportedOnlineTdc ? "slate" : "maroon"} />
+                          <Badge label={statusLabel} tone={statusTone} />
+                          <Badge
+                            label={paymentSummary.paymentStatus === "completed_payment" ? "Completed" : paymentSummary.paymentStatus === "partial_payment" ? "Partial" : paymentSummary.paymentStatus === "with_balance" ? "With Balance" : "Not Set"}
+                            tone={getPaymentTone(paymentSummary.paymentStatus)}
+                          />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-500">Promo Offer</p>
+                          <p className="mt-0.5 break-words">{paymentCategory.promoOfferName}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-500">Payment Terms</p>
+                          <p className="mt-0.5 break-words">{paymentCategory.paymentTerms}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-500">Balance</p>
+                          <p className="mt-0.5 font-semibold text-slate-900">PHP {paymentSummary.remainingBalance.toFixed(2)}</p>
+                          <p className="mt-0.5 text-slate-500">Paid: PHP {paymentSummary.totalPaid.toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-500">Remarks</p>
+                          <p className="mt-0.5 break-words">{latestSchedule?.instructor_remarks || "-"}</p>
+                          <p className="mt-0.5 break-words text-slate-500">{getStudentScheduleRemarks(latestSchedule) || "-"}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <p className="font-semibold text-slate-500">Starting</p>
+                            <p className="mt-0.5">{timelineDates.startedAt || "N/A"}</p>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-500">Completed</p>
+                            <p className="mt-0.5">{timelineDates.completedAt || "N/A"}</p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-500">Address</p>
+                          <p className="mt-0.5 break-words">{buildAddress(student.StudentProfile)}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        {enrollmentStatus === "pending" && !isImportedOnlineTdc ? (
+                          <button
+                            type="button"
+                            onClick={() => onClickPendingBadge?.(student)}
+                            className="mb-3 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800"
+                          >
+                            Click to accept pending enrollment
+                          </button>
+                        ) : null}
+                        {renderMobileActions(student)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          : null}
+      </div>
+
+      <div className="thin-scrollbar hidden overflow-auto max-h-[440px] md:block">
         <table className="min-w-[2400px] table-fixed text-sm">
           <thead className="sticky top-0 z-10 bg-[#800000] text-left text-white">
             <tr>

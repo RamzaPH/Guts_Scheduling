@@ -349,7 +349,145 @@ export default function PaymentLedgerPage() {
           </div>
         </div>
 
-        <div className="thin-scrollbar overflow-auto max-h-[70vh]">
+        <div className="md:hidden space-y-3 px-3 py-3">
+          {isLoading ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              Loading payment ledger...
+            </div>
+          ) : null}
+
+          {!isLoading && isError ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-8 text-center text-sm text-rose-700">
+              Failed to load payment ledger.
+            </div>
+          ) : null}
+
+          {!isLoading && !isError && rows.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              No matching payment records found.
+            </div>
+          ) : null}
+
+          {!isLoading && !isError
+            ? rows.map((row) => {
+                const fullName = [row.student.first_name, row.student.middle_name, row.student.last_name].filter(Boolean).join(" ");
+                const paymentLabel = row.summary.paymentStatus === "completed_payment"
+                  ? "Completed"
+                  : row.summary.paymentStatus === "partial_payment"
+                    ? "Partial"
+                    : row.summary.paymentStatus === "with_balance"
+                      ? "With Balance"
+                      : "Not Set";
+
+                return (
+                  <div
+                    key={row.student.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/students?focusStudentId=${row.student.id}`)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        navigate(`/students?focusStudentId=${row.student.id}`);
+                      }
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">{fullName || `Student #${row.student.id}`}</p>
+                        <p className="text-xs text-slate-500">ID #{row.student.id}</p>
+                      </div>
+                      <StatusBadge label={paymentLabel} tone={statusTone(row.summary.paymentStatus)} />
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600">
+                      <div>
+                        <p className="font-semibold text-slate-500">Course</p>
+                        <p className="mt-0.5 break-words text-slate-700">{row.course || "N/A"}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-500">Promo Offer</p>
+                        <p className="mt-0.5 break-words text-slate-700">{row.category.promoOfferName}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-500">Payment Terms</p>
+                        <p className="mt-0.5 break-words text-slate-700">{row.category.paymentTerms}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="font-semibold text-slate-500">Total Paid</p>
+                          <p className="mt-0.5 text-slate-700">{money(row.summary.totalPaid)}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-500">Balance</p>
+                          <p className="mt-0.5 font-semibold text-slate-900">{money(row.summary.remainingBalance)}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-500">Payments</p>
+                        <p className="mt-0.5 text-slate-700">{Array.isArray(row.enrollment?.payments) ? row.enrollment.payments.length : 0}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {row.enrollment?.id ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setPaymentTarget(row);
+                            }}
+                            className="rounded-md bg-[#800000] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#6d1224]"
+                          >
+                            Add Payment
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setPromoTarget(row);
+                            }}
+                            className="rounded-md border border-[#800000] bg-white px-3 py-1.5 text-xs font-semibold text-[#800000] hover:bg-[#800000]/5"
+                          >
+                            Add Promo
+                          </button>
+                        </>
+                      ) : null}
+                      {!row.enrollment?.id ? (
+                        <span className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                          Imported record
+                        </span>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/students?focusStudentId=${row.student.id}`);
+                        }}
+                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                      >
+                        Open Student
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setHistoryTarget(row);
+                        }}
+                        className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                      >
+                        Payment History
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            : null}
+        </div>
+
+        <div className="thin-scrollbar hidden overflow-auto max-h-[70vh] md:block">
           <table className="min-w-[1660px] table-fixed text-sm">
             <thead className="sticky top-0 z-10 bg-[#800000] text-left text-white">
               <tr>
