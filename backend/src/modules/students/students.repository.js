@@ -308,6 +308,16 @@ async function findSchedulesByStudentId(studentId, transaction) {
   });
 }
 
+async function findSchedulesByEnrollmentIds(enrollmentIds, transaction) {
+  if (!Array.isArray(enrollmentIds) || enrollmentIds.length === 0) return [];
+  return Schedule.findAll({
+    where: { enrollment_id: enrollmentIds },
+    attributes: ["id"],
+    transaction,
+    order: [["id", "DESC"]],
+  });
+}
+
 async function detachEnrollmentsFromSchedules(scheduleIds, transaction) {
   return Enrollment.update(
     { schedule_id: null },
@@ -406,6 +416,7 @@ module.exports = {
   updateStudentProfile,
   findEnrollmentsByStudentId,
   findSchedulesByStudentId,
+  findSchedulesByEnrollmentIds,
   detachEnrollmentsFromSchedules,
   deleteSchedulesByIds,
   findTdcEnrollmentByStudentId,

@@ -610,10 +610,13 @@ async function removeStudent(id) {
 
     const enrollments = await repository.findEnrollmentsByStudentId(id, transaction);
     const studentSchedules = await repository.findSchedulesByStudentId(id, transaction);
+    const enrollmentIds = (Array.isArray(enrollments) ? enrollments.map((e) => Number(e.id)).filter((v) => Number.isInteger(v) && v > 0) : []);
+    const enrollmentSchedules = enrollmentIds.length ? await repository.findSchedulesByEnrollmentIds(enrollmentIds, transaction) : [];
     const scheduleIds = [
       ...new Set([
         ...enrollments.map((enrollment) => Number(enrollment.schedule_id)),
         ...studentSchedules.map((schedule) => Number(schedule.id)),
+        ...enrollmentSchedules.map((s) => Number(s.id)),
       ].filter((scheduleId) => Number.isInteger(scheduleId) && scheduleId > 0)),
     ];
 

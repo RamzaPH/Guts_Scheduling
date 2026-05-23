@@ -119,8 +119,8 @@ function isCourseAllowedOnWeekday(dateIso, courseType) {
   }
 
   if (normalizedType === "pdc_beginner" || normalizedType === "pdc_experience") {
-    if (day < 1 || day > 4) {
-      return { allowed: false, reason: "PDC is strictly allowed Monday to Thursday only" };
+    if (day < 1 || day > 6) {
+      return { allowed: false, reason: "PDC is allowed Monday to Saturday only" };
     }
     return { allowed: true, reason: "Allowed" };
   }
