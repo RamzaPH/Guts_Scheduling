@@ -450,8 +450,6 @@ export default function PublicEnrollPage() {
     setSubmitState("submitting");
     setStatus("Submitting your enrollment...");
 
-    const promoPdcEnabled = normalizeBooleanValue(formData.promo_schedule_pdc?.enabled);
-
     const payload = {
       ...formData,
       student: {
@@ -468,7 +466,12 @@ export default function PublicEnrollPage() {
       },
       promo_schedule_pdc: {
         ...(formData.promo_schedule_pdc || {}),
-        enabled: promoPdcEnabled,
+        enabled: false,
+        schedule_date: "",
+        slot: "morning",
+        instructor_id: null,
+        care_of_instructor_id: null,
+        vehicle_id: null,
       },
       promo_schedule:
         (template?.enrollment_type || formData.enrollment_type) === "PROMO"
@@ -480,7 +483,12 @@ export default function PublicEnrollPage() {
               },
               pdc: {
                 ...(formData.promo_schedule_pdc || {}),
-                enabled: promoPdcEnabled,
+                enabled: false,
+                schedule_date: "",
+                slot: "morning",
+                instructor_id: null,
+                care_of_instructor_id: null,
+                vehicle_id: null,
               },
             }
           : undefined,
@@ -490,12 +498,6 @@ export default function PublicEnrollPage() {
       if (!payload.promo_schedule?.tdc?.schedule_date) {
         setSubmitState("idle");
         setStatus("Please provide the desired TDC date.");
-        return null;
-      }
-
-      if (payload.promo_schedule?.pdc?.enabled && !payload.promo_schedule?.pdc?.schedule_date) {
-        setSubmitState("idle");
-        setStatus("Please provide the desired PDC date when choosing Schedule Now.");
         return null;
       }
     }
@@ -532,7 +534,6 @@ export default function PublicEnrollPage() {
     const sourceSections = template?.sections || [];
     const processedSections = [];
     const effectiveEnrollmentType = resolveQrEnrollmentType(template);
-    const isPDCScheduleNow = formData.promo_schedule_pdc?.enabled === "true" || formData.promo_schedule_pdc?.enabled === true;
 
     for (const section of sourceSections) {
       if ((effectiveEnrollmentType === "TDC" || effectiveEnrollmentType === "PDC") && (section.title === "DRIVING INFORMATION" || section.title === "Schedule Session")) {
@@ -549,19 +550,6 @@ export default function PublicEnrollPage() {
         return field;
       });
 
-      // For PROMO: hide PDC COURSE INFORMATION and PDC Schedule Session unless "Schedule Now" is selected
-      if (template?.enrollment_type === "PROMO") {
-        if ((section.title === "PDC COURSE INFORMATION" || section.title === "PDC Schedule Session") && !isPDCScheduleNow) {
-          // Skip these sections if Schedule Later is selected
-          continue;
-        }
-      }
-
-      // For PDC Schedule Session, hide the date field when "Schedule Later" is selected
-      if (section.title === "PDC Schedule Session" && (formData.promo_schedule_pdc?.enabled === "false" || formData.promo_schedule_pdc?.enabled === false)) {
-        fields = fields.filter(field => field.name !== "promo_schedule_pdc.schedule_date");
-      }
-
       processedSections.push({
         ...section,
         fields,
@@ -569,7 +557,7 @@ export default function PublicEnrollPage() {
     }
 
     return processedSections;
-  }, [template, promoOptions, formData]);
+  }, [template, promoOptions]);
 
   const promoModalRef = useRef(null);
 
@@ -651,15 +639,8 @@ export default function PublicEnrollPage() {
           {!loading ? (
             <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
               {sections.map((section) => {
-                // Filter fields conditionally based on form state
                 let fieldsToRender = section.fields || [];
-                
-                // For PDC Schedule Session, hide the desired date field when "Schedule Later" is selected
-                // The enabled value is "false" when Schedule Later is selected
-                if (section.title === "PDC Schedule Session" && (formData.promo_schedule_pdc?.enabled === "Schedule Later" || formData.promo_schedule_pdc?.enabled === false || formData.promo_schedule_pdc?.enabled === "false")) {
-                  fieldsToRender = fieldsToRender.filter(field => field.name !== "promo_schedule_pdc.schedule_date");
-                }
-                
+
                 return (
                 <div key={section.title}>
                   <div className="public-qr-section rounded-[28px] border border-slate-200 bg-slate-50 p-5 card-light">
@@ -693,12 +674,6 @@ export default function PublicEnrollPage() {
                     </div>
                   </div>
 
-                  {/* Show message when Schedule Later is selected in PROMO forms */}
-                  {template?.enrollment_type === "PROMO" && section.title === "PDC Start Option" && formData.promo_schedule_pdc?.enabled === "false" && (
-                    <div className="mt-4 rounded-2xl border border-[#d9c9a0] bg-white px-4 py-3 text-sm text-slate-600 card-light">
-                      PDC is set to Schedule Later. PDC course information and schedule fields are hidden for now and can be filled once Schedule PDC Now is selected.
-                    </div>
-                  )}
                 </div>
                 );
               })}

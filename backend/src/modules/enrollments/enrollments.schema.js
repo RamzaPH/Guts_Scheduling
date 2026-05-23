@@ -170,9 +170,7 @@ const enrollmentCreateSchema = Joi.object({
     });
   }
 
-  const promoPdcEnabled = Boolean(value.promo_schedule?.pdc?.enabled);
-
-  if (value.enrollment_type === "PROMO" && promoPdcEnabled && !hasPdcSelection) {
+  if (value.enrollment_type === "PROMO" && !hasPdcSelection) {
     return helpers.error("any.custom", {
       message: "pdc_category is required for PROMO enrollments",
     });
@@ -181,8 +179,6 @@ const enrollmentCreateSchema = Joi.object({
   const promoScheduleEnabled = Boolean(value.promo_schedule?.enabled);
   if (value.enrollment_type === "PROMO" && promoScheduleEnabled) {
     const promoTdc = value.promo_schedule?.tdc || {};
-    const promoPdc = value.promo_schedule?.pdc || {};
-    const promoPdcEnabled = Boolean(promoPdc.enabled);
     const isPublicQr = value.enrollment?.enrollment_channel === "qr_public";
 
     if (!promoTdc.schedule_date) {
@@ -197,16 +193,6 @@ const enrollmentCreateSchema = Joi.object({
           message: "promo_schedule.tdc requires slot and instructor_id",
         });
       }
-
-      if (promoPdcEnabled && (!promoPdc.schedule_date || !promoPdc.slot || !promoPdc.instructor_id || !promoPdc.vehicle_id)) {
-        return helpers.error("any.custom", {
-          message: "promo_schedule.pdc requires schedule_date, slot, instructor_id, and vehicle_id",
-        });
-      }
-    } else if (promoPdcEnabled && !promoPdc.schedule_date) {
-      return helpers.error("any.custom", {
-        message: "promo_schedule.pdc requires schedule_date when Schedule Now is selected",
-      });
     }
   }
 

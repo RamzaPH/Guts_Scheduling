@@ -23,6 +23,7 @@ import { useScheduleMonthStatus } from "../hooks/useScheduleMonthStatus";
 import { formatDateToISO, parseDateValue } from "../../../shared/utils/date";
 import ToastStack from "../../../shared/utils/ToastStack";
 import { useToast } from "../../../shared/utils/toast";
+import { resolvePromoPrice } from "../../../shared/utils/promoPricing";
 import { resourceServices } from "../../../services/resources";
 import { deleteStudent, updateEnrollmentStatus } from "../../students/services/studentsApi";
 import { fetchPendingApprovals } from "../services/dashboardApi";
@@ -237,7 +238,7 @@ export default function DashboardPage() {
     const rows = Array.isArray(promoOffersData) ? promoOffersData : promoOffersData?.items || promoOffersData?.data || [];
     return rows.map((offer) => ({
       value: offer.id,
-      label: `${offer.name} - ₱${Number(offer.discounted_price || offer.fixed_price || 0).toFixed(2)}`,
+      label: `${offer.name} - ₱${resolvePromoPrice(offer).toFixed(2)}`,
       discounted_price: offer.discounted_price,
       fixed_price: offer.fixed_price,
       name: offer.name,

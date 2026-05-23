@@ -43,6 +43,7 @@ export default function PaymentHistoryModal({
   totalPaid,
   remainingBalance,
   payments = [],
+  promoLabels = [],
   onClose,
 }) {
   return (
@@ -84,13 +85,14 @@ export default function PaymentHistoryModal({
                 <th className="w-[120px] px-3 py-2 font-semibold">Amount</th>
                 <th className="w-[120px] px-3 py-2 font-semibold">Method</th>
                 <th className="w-[130px] px-3 py-2 font-semibold">Status</th>
+                <th className="w-[260px] px-3 py-2 font-semibold">Promo</th>
                 <th className="w-[180px] px-3 py-2 font-semibold">OR Number</th>
               </tr>
             </thead>
             <tbody>
               {!Array.isArray(payments) || payments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-3 py-8 text-center text-slate-500">
                     No payment records found for this student.
                   </td>
                 </tr>
@@ -102,6 +104,8 @@ export default function PaymentHistoryModal({
                     .replace(/_/g, " ")
                     .replace(/\b\w/g, (char) => char.toUpperCase());
                   const createdAt = payment?.payment_date || payment?.created_at || payment?.createdAt;
+                  const promoFromPayment = payment?.promo_name || payment?.promo_offer_name || payment?.promo || null;
+                  const promoText = promoFromPayment || (Array.isArray(promoLabels) && promoLabels.length ? promoLabels.join(", ") : "-");
 
                   return (
                     <tr key={payment?.id || `${createdAt}-${index}`} className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}>
@@ -111,6 +115,7 @@ export default function PaymentHistoryModal({
                       <td className="px-3 py-2.5">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}>{status}</span>
                       </td>
+                      <td className="px-3 py-2.5 text-slate-700 break-words">{promoText}</td>
                       <td className="px-3 py-2.5 text-slate-700">{payment?.reference_number || payment?.receipt_number || "-"}</td>
                     </tr>
                   );

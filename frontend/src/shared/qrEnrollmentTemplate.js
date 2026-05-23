@@ -132,27 +132,10 @@ const templatesByType = {
         dateField("promo_schedule_tdc.schedule_date", "Desired Date", true),
         { type: "note", content: "Encoder/staff will assign the instructor, time slot, and final schedule details after review." }
       ]),
-      section("PDC Start Option", "Choose whether the PDC leg should be scheduled now or left for later review.", [
-        selectField(
-          "promo_schedule_pdc.enabled",
-          "PDC Start Option",
-          [
-            { value: "true", label: "Schedule Now" },
-            { value: "false", label: "Schedule Later" },
-          ],
-          true
-        ),
+      // PDC scheduling at creation is disabled: always schedule later. Encoder/staff will assign PDC schedule after review.
+      section("PDC Details", "PDC is automatically set to Schedule Later.", [
+        { type: "note", content: "PDC is automatically set to Schedule Later. PDC course information stays here, and the schedule will be assigned after review." },
       ]),
-      section("PDC COURSE INFORMATION", "Pick the PDC track and related training details.", [
-        selectField("extras.enrolling_for", "ENROLLING FOR", promoPdcEnrollingForOptions, true),
-        selectField("enrollment.pdc_category", "PDC CLASSIFICATION", pdcClassificationOptions, true),
-        selectField("enrollment.is_already_driver", "MARUNONG KA NA BANG MAGMANEHO?", yesNoOptions, false),
-        selectField("enrollment.target_vehicle", "ANONG SASAKYAN ANG IMAMANEHO?", pdcVehicleTypeOptions, false),
-        { type: "note", content: "IMPORTANT REMINDERS FOR PDC STUDENTS: PER DL CODES PO ANG ATING PDC. EVERY DL CODES MAGKAKAIBA ANG RATES AND SCHEDULE." }
-      ]),
-      section("PDC Schedule Session", "Set the PDC schedule for promo enrollment.", [
-        dateField("promo_schedule_pdc.schedule_date", "Desired Date", false),
-      ])
     ],
   },
 };

@@ -98,6 +98,41 @@ function StatusBadge({ label, tone }) {
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}>{label}</span>;
 }
 
+function buildEnrollmentPromoLabels(enrollment, promoOfferRows = []) {
+  if (!enrollment) return [];
+
+  const names = [];
+  const offerMap = new Map((Array.isArray(promoOfferRows) ? promoOfferRows : []).map((offer) => [String(offer?.id), offer?.name]));
+
+  const pushUnique = (value) => {
+    const text = String(value || "").trim();
+    if (!text || text.toLowerCase() === "none") return;
+    if (!names.includes(text)) {
+      names.push(text);
+    }
+  };
+
+  pushUnique(enrollment?.promoOffer?.name || enrollment?.PromoOffer?.name || enrollment?.promo_offer_name);
+
+  const primaryPromoId = enrollment?.promo_offer_id;
+  if (primaryPromoId !== null && primaryPromoId !== undefined && primaryPromoId !== "") {
+    pushUnique(offerMap.get(String(primaryPromoId)) || `Promo #${primaryPromoId}`);
+  }
+
+  if (Array.isArray(enrollment?.additionalPromoOffers)) {
+    enrollment.additionalPromoOffers.forEach((offer) => pushUnique(offer?.name));
+  }
+
+  if (Array.isArray(enrollment?.additional_promo_offer_ids)) {
+    enrollment.additional_promo_offer_ids.forEach((id) => {
+      if (id === null || id === undefined || id === "") return;
+      pushUnique(offerMap.get(String(id)) || `Promo #${id}`);
+    });
+  }
+
+  return names;
+}
+
 export default function PaymentLedgerPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -125,6 +160,11 @@ export default function PaymentLedgerPage() {
 
   const promoOffers = useMemo(
     () => (Array.isArray(promoOffersData) ? promoOffersData : []).filter((offer) => String(offer?.status || "").toLowerCase() === "active"),
+    [promoOffersData]
+  );
+
+  const promoOfferRows = useMemo(
+    () => (Array.isArray(promoOffersData) ? promoOffersData : promoOffersData?.data || []),
     [promoOffersData]
   );
 
@@ -628,6 +668,7 @@ export default function PaymentLedgerPage() {
           paymentTerms={historyTarget.category?.paymentTerms}
           totalPaid={historyTarget.summary?.totalPaid}
           remainingBalance={historyTarget.summary?.remainingBalance}
+          promoLabels={buildEnrollmentPromoLabels(historyTarget.enrollment, promoOfferRows)}
           payments={[...(Array.isArray(historyTarget.enrollment?.payments) ? historyTarget.enrollment.payments : [])].sort((a, b) => {
             const dateA = new Date(a?.payment_date || a?.created_at || a?.createdAt || 0).getTime();
             const dateB = new Date(b?.payment_date || b?.created_at || b?.createdAt || 0).getTime();

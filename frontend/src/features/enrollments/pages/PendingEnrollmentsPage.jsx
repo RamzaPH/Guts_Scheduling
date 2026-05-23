@@ -6,6 +6,7 @@ import { api } from "../../../services/api";
 import PaymentDetailsModal from "../components/PaymentDetailsModal.jsx";
 import ToastStack from "../../../shared/utils/ToastStack";
 import { getStudentSourceLabel, getStudentFullName } from "../../students/utils/studentsPageUtils";
+import { resolvePromoPrice } from "../../../shared/utils/promoPricing";
 
 export default function PendingEnrollmentsPage() {
   const [toastMsg, setToastMsg] = useState("");
@@ -49,7 +50,7 @@ export default function PendingEnrollmentsPage() {
   const promoOfferOptions = useMemo(() => {
     return (promoOffers || []).map((po) => ({
       value: po.id,
-      label: `${po.name} - ₱${Number(po.discounted_price || po.fixed_price || 0).toFixed(2)}`,
+      label: `${po.name} - ₱${resolvePromoPrice(po).toFixed(2)}`,
       discounted_price: po.discounted_price,
       fixed_price: po.fixed_price,
       name: po.name,

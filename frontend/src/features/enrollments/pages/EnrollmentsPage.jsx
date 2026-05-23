@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+﻿import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, GraduationCap, LoaderCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -87,7 +87,7 @@ const INITIAL_FORM = {
     vehicle_id: "",
   },
   promo_schedule_pdc: {
-    enabled: true,
+    enabled: false,
     schedule_date: "",
     slot: "morning",
     instructor_id: "",
@@ -203,20 +203,17 @@ function buildEnrollmentPayload(type, form) {
           : type === "PROMO"
             ? promoTrainingMethod
             : "",
-      pdc_start_mode:
-        type === "PROMO"
-          ? (form.promo_schedule_pdc.enabled ? "now" : "later")
-          : null,
+      pdc_start_mode: type === "PROMO" ? "later" : null,
       pdc_category: type === "PDC" || type === "PROMO" ? form.enrollment.pdc_category : null,
       status: "pending",
     },
     schedule: {
-      enabled: Boolean(type === "PROMO" ? form.promo_schedule_pdc.enabled : form.schedule.enabled),
-      schedule_date: (type === "PROMO" ? form.promo_schedule_pdc.schedule_date : form.schedule.schedule_date) || null,
-      slot: (type === "PROMO" ? form.promo_schedule_pdc.slot : form.schedule.slot) || null,
-      instructor_id: toNullableNumber(type === "PROMO" ? form.promo_schedule_pdc.instructor_id : form.schedule.instructor_id),
-      care_of_instructor_id: toNullableNumber(type === "PROMO" ? form.promo_schedule_pdc.care_of_instructor_id : form.schedule.care_of_instructor_id),
-      vehicle_id: toNullableNumber(type === "PROMO" ? form.promo_schedule_pdc.vehicle_id : form.schedule.vehicle_id),
+      enabled: type === "PROMO" ? false : Boolean(form.schedule.enabled),
+      schedule_date: type === "PROMO" ? null : (form.schedule.schedule_date || null),
+      slot: type === "PROMO" ? null : (form.schedule.slot || null),
+      instructor_id: type === "PROMO" ? null : toNullableNumber(form.schedule.instructor_id),
+      care_of_instructor_id: type === "PROMO" ? null : toNullableNumber(form.schedule.care_of_instructor_id),
+      vehicle_id: type === "PROMO" ? null : toNullableNumber(form.schedule.vehicle_id),
     },
     promo_schedule: type === "PROMO" ? {
       enabled: true,
@@ -229,12 +226,12 @@ function buildEnrollmentPayload(type, form) {
         vehicle_id: null,
       },
       pdc: {
-        enabled: Boolean(form.promo_schedule_pdc.enabled),
-        schedule_date: form.promo_schedule_pdc.schedule_date || null,
-        slot: form.promo_schedule_pdc.slot || null,
-        instructor_id: toNullableNumber(form.promo_schedule_pdc.instructor_id),
-        care_of_instructor_id: toNullableNumber(form.promo_schedule_pdc.care_of_instructor_id),
-        vehicle_id: toNullableNumber(form.promo_schedule_pdc.vehicle_id),
+        enabled: false,
+        schedule_date: null,
+        slot: null,
+        instructor_id: null,
+        care_of_instructor_id: null,
+        vehicle_id: null,
       },
     } : null,
   };
@@ -479,12 +476,7 @@ export default function EnrollmentsPage() {
       instructorId: form.promo_schedule_pdc.instructor_id ? Number(form.promo_schedule_pdc.instructor_id) : undefined,
       vehicleId: form.promo_schedule_pdc.vehicle_id ? Number(form.promo_schedule_pdc.vehicle_id) : undefined,
     }),
-    enabled:
-      step === 1
-      && isPromo
-      && Boolean(form.promo_schedule_pdc.enabled)
-      && Boolean(form.promo_schedule_pdc.schedule_date)
-      && Boolean(promoPdcCourseType),
+    enabled: false,
     staleTime: 10 * 1000,
   });
 
@@ -621,24 +613,7 @@ export default function EnrollmentsPage() {
     });
   }, [isMotorcycleWholeDaySchedule]);
 
-  useEffect(() => {
-    if (!isPromo || !form.promo_schedule_pdc.enabled) return;
-    if (!isPromoPdcWholeDaySchedule) return;
-    Promise.resolve().then(() => {
-      setForm((current) => {
-        if (current.promo_schedule_pdc.slot === "morning") {
-          return current;
-        }
-        return {
-          ...current,
-          promo_schedule_pdc: {
-            ...current.promo_schedule_pdc,
-            slot: "morning",
-          },
-        };
-      });
-    });
-  }, [isPromo, form.promo_schedule_pdc.enabled, isPromoPdcWholeDaySchedule]);
+  
 
   useEffect(() => {
     if (isScheduleTdc) return;
@@ -853,23 +828,6 @@ export default function EnrollmentsPage() {
     }
   }
 
-  function handlePromoPdcScheduleModeChange(nextMode) {
-    const shouldScheduleNow = nextMode === "now";
-
-    setForm((current) => ({
-      ...current,
-      promo_schedule_pdc: {
-        ...current.promo_schedule_pdc,
-        enabled: shouldScheduleNow,
-        schedule_date: shouldScheduleNow ? current.promo_schedule_pdc.schedule_date : "",
-        slot: shouldScheduleNow ? current.promo_schedule_pdc.slot : "morning",
-        instructor_id: shouldScheduleNow ? current.promo_schedule_pdc.instructor_id : "",
-        care_of_instructor_id: shouldScheduleNow ? current.promo_schedule_pdc.care_of_instructor_id : "",
-        vehicle_id: shouldScheduleNow ? current.promo_schedule_pdc.vehicle_id : "",
-      },
-    }));
-  }
-
   function handleContinue() {
     if (selectedType) {
       setStep(1);
@@ -917,10 +875,7 @@ export default function EnrollmentsPage() {
       }
     }
 
-    if (selectedType === "PROMO" && form.promo_schedule_pdc.enabled && !form.enrollment.pdc_category) {
-      addToast("PDC classification is required for promo enrollment.");
-      return;
-    }
+    // Promo PDC is always schedule-later at creation; no PDC schedule validation here.
 
     if (selectedType === "PROMO") {
       if (!form.promo_schedule_tdc.schedule_date || !form.promo_schedule_tdc.instructor_id) {
@@ -928,20 +883,8 @@ export default function EnrollmentsPage() {
         return;
       }
 
-      if (form.promo_schedule_pdc.enabled) {
-        if (!form.promo_schedule_pdc.schedule_date || !form.promo_schedule_pdc.instructor_id) {
-          addToast("Please complete the PDC schedule session details for promo enrollment.");
-          return;
-        }
-
-        if (!form.promo_schedule_pdc.vehicle_id) {
-          addToast("Please assign a vehicle for the promo PDC schedule.");
-          return;
-        }
-      }
-
-      if (promoTdcSelectedSlot?.full || (form.promo_schedule_pdc.enabled && promoPdcSelectedSlot?.full)) {
-        addToast("One of the promo schedule sessions is fully booked. Choose another date or slot.");
+      if (promoTdcSelectedSlot?.full) {
+        addToast("The promo TDC schedule session is fully booked. Choose another date or slot.");
         return;
       }
     } else {
@@ -1141,7 +1084,6 @@ export default function EnrollmentsPage() {
                 <PromoFormSections
                   form={form}
                   onFieldChange={handleFieldChange}
-                  onPromoPdcScheduleModeChange={handlePromoPdcScheduleModeChange}
                   promoTdcInstructorOptions={promoTdcInstructorOptions}
                   promoPdcInstructorOptions={promoPdcInstructorOptions}
                   promoVehicleOptions={vehicleOptions}

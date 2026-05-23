@@ -1,19 +1,6 @@
 import { useMemo, useState } from "react";
 import { AlertCircle, X } from "lucide-react";
-
-function getPromoPrice(offer) {
-  const discounted = Number(offer?.discounted_price);
-  if (Number.isFinite(discounted) && discounted > 0) {
-    return discounted;
-  }
-
-  const fixed = Number(offer?.fixed_price);
-  if (Number.isFinite(fixed) && fixed > 0) {
-    return fixed;
-  }
-
-  return 0;
-}
+import { resolvePromoPrice } from "../../../shared/utils/promoPricing";
 
 export default function AddPromoModal({
   studentName,
@@ -32,7 +19,7 @@ export default function AddPromoModal({
   }, [promoOffers]);
 
   const selectedPromo = activePromos.find((offer) => String(offer.id) === String(selectedPromoId)) || null;
-  const selectedPrice = selectedPromo ? getPromoPrice(selectedPromo) : 0;
+  const selectedPrice = selectedPromo ? resolvePromoPrice(selectedPromo) : 0;
   const balanceAfterPromo = Number(currentBalance || 0) + Number(selectedPrice || 0);
 
   function handleSubmit(event) {
@@ -54,7 +41,7 @@ export default function AddPromoModal({
         <div className="flex items-center justify-between bg-[#800000] px-6 py-4">
           <div>
             <h2 className="text-base font-semibold text-white">Add Promo — {studentName || "Student"}</h2>
-            <p className="mt-0.5 text-xs text-white/80">Select one promo, then continue to payment.</p>
+            <p className="mt-0.5 text-xs text-white/80">Select one promo, then apply it to the balance.</p>
           </div>
           <button type="button" onClick={onCancel} className="text-white/70 hover:text-white">
             <X size={18} />
@@ -84,7 +71,7 @@ export default function AddPromoModal({
                 activePromos.map((offer) => {
                   const offerId = String(offer.id);
                   const isSelected = String(selectedPromoId) === offerId;
-                  const price = getPromoPrice(offer);
+                  const price = resolvePromoPrice(offer);
                   const applicability = offer?.is_applicable ? "Selectable" : "Selectable as additional promo";
 
                   return (
@@ -164,9 +151,6 @@ export default function AddPromoModal({
               <p className="mt-4 text-xs text-slate-600">
                 <strong>Apply Promo Only:</strong> Adds PHP {selectedPrice.toFixed(2)} to the balance. Payment not recorded yet.
               </p>
-              <p className="mt-2 text-xs text-slate-600">
-                <strong>Apply & Record Payment:</strong> Adds promo and opens payment recording for PHP {selectedPrice.toFixed(2)}.
-              </p>
 
               <div className="mt-4 flex flex-col justify-end gap-2 sm:flex-row">
                 <button
@@ -183,14 +167,6 @@ export default function AddPromoModal({
                   className="rounded-lg border border-[#800000] bg-white px-4 py-2 text-sm font-semibold text-[#800000] hover:bg-[#800000]/5"
                 >
                   Apply Promo Only
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onSubmit?.({ promoOffer: selectedPromo, promoOfferId: selectedPromo.id, promoPrice: selectedPrice, payNow: true })}
-                  disabled={isPending}
-                  className="rounded-lg bg-[#800000] px-4 py-2 text-sm font-semibold text-white"
-                >
-                  Apply & Record Payment
                 </button>
               </div>
             </div>

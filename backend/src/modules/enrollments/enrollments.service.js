@@ -357,8 +357,7 @@ async function initializePromoLifecycle({ payload, enrollment, student, transact
 
   const tdcDeadline = toDateOnly(addDays(now, 30));
   const pdcValidUntil = toDateOnly(addDays(now, 365));
-  const schedulePdcNow = Boolean(payload.promo_schedule?.pdc?.enabled);
-  const pdcStartMode = schedulePdcNow ? "now" : "later";
+  const pdcStartMode = "later";
 
   const promoPackage = await repository.createPromoPackage(
     {
@@ -690,7 +689,7 @@ async function addEnrollment(payload) {
       enrollment.Student = student;
       enrollment.DLCode = dlCode;
 
-      const shouldSchedulePromoPdc = Boolean(payload.promo_schedule?.pdc?.enabled);
+      const shouldSchedulePromoPdc = false;
 
       const promoTdc = await schedulesService.addSchedule(
         normalizeSchedulePayload(payload.promo_schedule?.tdc, payload, enrollment, "tdc"),
