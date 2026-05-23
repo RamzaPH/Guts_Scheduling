@@ -1,4 +1,5 @@
 const { Student } = require("../models");
+const service = require("../src/modules/students/students.service");
 
 const getAllStudents = async (req, res) => {
   try {
@@ -58,14 +59,7 @@ const updateStudent = async (req, res) => {
 
 const deleteStudent = async (req, res) => {
   try {
-    const { id } = req.params;
-    const student = await Student.findByPk(id);
-
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    await student.destroy();
+    await service.removeStudent(req.params.id);
     return res.status(200).json({ message: "Student deleted successfully" });
   } catch (error) {
     return res.status(500).json({ message: "Failed to delete student", error: error.message });

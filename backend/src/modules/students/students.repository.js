@@ -299,6 +299,32 @@ async function findEnrollmentsByStudentId(studentId, transaction) {
   });
 }
 
+async function findSchedulesByStudentId(studentId, transaction) {
+  return Schedule.findAll({
+    where: { student_id: studentId },
+    attributes: ["id"],
+    transaction,
+    order: [["id", "DESC"]],
+  });
+}
+
+async function detachEnrollmentsFromSchedules(scheduleIds, transaction) {
+  return Enrollment.update(
+    { schedule_id: null },
+    {
+      where: { schedule_id: scheduleIds },
+      transaction,
+    }
+  );
+}
+
+async function deleteSchedulesByIds(scheduleIds, transaction) {
+  return Schedule.destroy({
+    where: { id: scheduleIds },
+    transaction,
+  });
+}
+
 async function findTdcEnrollmentByStudentId(studentId, transaction) {
   return Enrollment.findOne({
     where: { student_id: studentId },
@@ -379,6 +405,9 @@ module.exports = {
   createStudentProfile,
   updateStudentProfile,
   findEnrollmentsByStudentId,
+  findSchedulesByStudentId,
+  detachEnrollmentsFromSchedules,
+  deleteSchedulesByIds,
   findTdcEnrollmentByStudentId,
   detachEnrollmentsFromStudent,
   deleteStudentProfile,

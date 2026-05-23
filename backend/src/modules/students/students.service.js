@@ -609,10 +609,17 @@ async function removeStudent(id) {
     }
 
     const enrollments = await repository.findEnrollmentsByStudentId(id, transaction);
-    const scheduleIds = [...new Set(enrollments.map((enrollment) => Number(enrollment.schedule_id)).filter((scheduleId) => Number.isInteger(scheduleId) && scheduleId > 0))];
+    const studentSchedules = await repository.findSchedulesByStudentId(id, transaction);
+    const scheduleIds = [
+      ...new Set([
+        ...enrollments.map((enrollment) => Number(enrollment.schedule_id)),
+        ...studentSchedules.map((schedule) => Number(schedule.id)),
+      ].filter((scheduleId) => Number.isInteger(scheduleId) && scheduleId > 0)),
+    ];
 
-    for (const scheduleId of scheduleIds) {
-      await schedulesService.cancelSchedule(scheduleId, "both", { transaction });
+    if (scheduleIds.length) {
+      await repository.detachEnrollmentsFromSchedules(scheduleIds, transaction);
+      await repository.deleteSchedulesByIds(scheduleIds, transaction);
     }
 
     const profile = await repository.findStudentProfileByStudentId(id, transaction);
