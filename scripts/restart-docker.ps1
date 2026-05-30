@@ -1,110 +1,204 @@
-# Restart Docker Desktop safely - stop processes, backup config, unregister WSL, restart Docker
-# Usage: PowerShell -NoProfile -ExecutionPolicy Bypass -File .\scripts\restart-docker.ps1
+param(
+    [switch]$SkipLaunch,
+    [int]$StartTimeoutSeconds = 120,
+    [switch]$Elevated
+)
 
 $ErrorActionPreference = 'Stop'
-Write-Host "== Docker cleanup started ==" 
 
-# Stop docker-related processes
-$processNames = @('Docker Desktop', 'docker', 'vpnkit', 'com.docker', 'dockerd', 'docker-desktop', 'DockerDesktop')
-$processes = @()
-Get-Process | Where-Object { $_.ProcessName -in $processNames } | ForEach-Object { $processes += $_ }
+function Write-Step([string]$message) {
+    Write-Host "[docker-fix] $message" -ForegroundColor Cyan
+}
 
-# Also attempt to find processes by image/commandline using WMI (handles 'Docker Desktop.exe' exact image names)
-try {
-    $wmiMatches = Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'Docker(.exe)?' -or ($_.CommandLine -and $_.CommandLine -match 'Docker Desktop') }
-    foreach ($p in $wmiMatches) {
-        if (-not ($processes | Where-Object { $_.Id -eq $p.ProcessId })) {
-            try {
-                $proc = Get-Process -Id $p.ProcessId -ErrorAction Stop
-                $processes += $proc
-            } catch {
-                # If Get-Process failed, create a synthetic object with Id only
-                $processes += (New-Object PSObject -Property @{ Id = $p.ProcessId; ProcessName = $p.Name })
-            }
+function Get-DockerProcessCandidates {
+    $processes = @()
+    $processNames = @(
+        'Docker Desktop',
+        'Docker desktop',
+        'DockerDesktop',
+        'com.docker.backend',
+        'com.docker.build',
+        'dockerd',
+        'vpnkit',
+        'docker'
+    )
+
+    foreach ($process in Get-Process -ErrorAction SilentlyContinue) {
+        if ($process.ProcessName -in $processNames) {
+            $processes += $process
         }
     }
-} catch {
-    # ignore WMI errors
-}
 
-if ($processes.Count -gt 0) {
-    Write-Host "Stopping processes"
-    $processes | ForEach-Object { 
-        try { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue } catch {}
+    try {
+        $wmiMatches = Get-CimInstance Win32_Process | Where-Object {
+            $_.Name -match 'Docker|com\.docker|dockerd|vpnkit' -or ($_.CommandLine -and $_.CommandLine -match 'Docker Desktop')
+        }
+
+        foreach ($wmiProcess in $wmiMatches) {
+            if (-not ($processes | Where-Object { $_.Id -eq $wmiProcess.ProcessId })) {
+                try {
+                    $processes += (Get-Process -Id $wmiProcess.ProcessId -ErrorAction Stop)
+                } catch {
+                    $processes += (New-Object PSObject -Property @{ Id = $wmiProcess.ProcessId; ProcessName = $wmiProcess.Name })
+                }
+            }
+        }
+    } catch {
+        Write-Step "Skipping WMI lookup: $($_.Exception.Message)"
     }
-    Start-Sleep -Seconds 1
-} else {
-    Write-Host "No docker processes found"
+
+    return $processes | Sort-Object Id -Unique
 }
 
-# Backup Docker configuration directories
-$timestamp = (Get-Date).ToString('yyyyMMddHHmmss')
-$userProfile = $env:USERPROFILE
-$backupFolder = Join-Path $userProfile "docker-cleanup-backup-$timestamp"
-New-Item -Path $backupFolder -ItemType Directory -Force | Out-Null
+function Stop-DockerProcesses {
+    $processes = Get-DockerProcessCandidates
+    if (-not $processes -or $processes.Count -eq 0) {
+        Write-Step "No lingering Docker processes found."
+        return
+    }
 
-$appData = $env:APPDATA
-$localAppData = $env:LOCALAPPDATA
+    Write-Step "Stopping lingering Docker processes: $($processes.ProcessName -join ', ')"
+    foreach ($process in $processes) {
+        try {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        } catch {
+            Write-Step "Could not stop PID $($process.Id): $($_.Exception.Message)"
+        }
+    }
 
-$appDockerPath = Join-Path $appData "Docker"
-$localDockerPath = Join-Path $localAppData "Docker"
+    Start-Sleep -Seconds 2
 
-foreach ($dockerPath in @($appDockerPath, $localDockerPath)) {
-    if (Test-Path $dockerPath) {
-        $backupPath = Join-Path $backupFolder (Split-Path $dockerPath -Leaf)
-        Write-Host "Backing up $dockerPath"
-        Move-Item -Path $dockerPath -Destination $backupPath -Force -ErrorAction SilentlyContinue
+    $remaining = Get-DockerProcessCandidates
+    if ($remaining -and $remaining.Count -gt 0) {
+        Write-Step "Processes still present after first pass; retrying once."
+        foreach ($process in $remaining) {
+            try {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            } catch {
+                Write-Step "Second pass could not stop PID $($process.Id): $($_.Exception.Message)"
+            }
+        }
+        Start-Sleep -Seconds 2
     }
 }
 
-# Unregister docker-desktop WSL distro
-$wslDistros = wsl --list --quiet 2>$null
-if ($wslDistros -match "docker-desktop") {
-    Write-Host "Unregistering docker-desktop WSL distro"
-    wsl --unregister docker-desktop 2>$null
-    Start-Sleep -Seconds 1
+function Test-DockerResponsive {
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        return $false
+    }
+
+    try {
+        docker info *> $null
+        return $LASTEXITCODE -eq 0
+    } catch {
+        return $false
+    }
 }
 
-# Shutdown WSL
-Write-Host "Shutting down WSL"
-wsl --shutdown 2>$null
-Start-Sleep -Seconds 1
+function Test-IsAdministrator {
+    $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object System.Security.Principal.WindowsPrincipal($currentIdentity)
+    return $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+}
 
-# Start Docker Desktop
+function Invoke-ElevatedSelf {
+    $scriptPath = $PSCommandPath
+    if (-not $scriptPath) {
+        Write-Step "Cannot resolve script path for elevation handoff."
+        exit 4
+    }
+
+    $argumentList = @(
+        '-NoProfile'
+        '-ExecutionPolicy'
+        'Bypass'
+        '-File'
+        "`"$scriptPath`""
+        '-Elevated'
+    )
+
+    if ($SkipLaunch) {
+        $argumentList += '-SkipLaunch'
+    }
+
+    $argumentList += @('-StartTimeoutSeconds', $StartTimeoutSeconds)
+
+    Write-Step "Requesting an elevated helper session to clear protected Docker processes."
+    Start-Process -FilePath (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe') -Verb RunAs -ArgumentList $argumentList
+    exit 0
+}
+
+function Start-DockerDesktop {
+    param(
+        [string]$DockerExePath
+    )
+
+    if (Test-IsAdministrator) {
+        try {
+            Start-Service -Name 'com.docker.service' -ErrorAction Stop
+            Write-Step "Docker service start requested from an elevated session."
+        } catch {
+            Write-Step "Could not start com.docker.service directly: $($_.Exception.Message)"
+        }
+
+        Start-Process -FilePath $DockerExePath
+        return
+    }
+
+    Write-Step "Docker service needs elevation; launching Docker Desktop with a UAC prompt."
+    Start-Process -FilePath $DockerExePath -Verb RunAs
+}
+
+Write-Step "Docker cleanup started"
+
+if (-not $Elevated -and -not (Test-IsAdministrator)) {
+    Invoke-ElevatedSelf
+}
+
+if (Test-DockerResponsive) {
+    Write-Step "Docker is already responding; no cleanup needed."
+    exit 0
+}
+
+Stop-DockerProcesses
+
+if ($SkipLaunch) {
+    Write-Step "Skipping Docker Desktop launch as requested."
+    exit 0
+}
+
 $dockerExe = 'C:\Program Files\Docker\Docker\Docker Desktop.exe'
-if (-not (Test-Path $dockerExe)) { 
-    Write-Host "Docker executable not found at $dockerExe" -ForegroundColor Red
-    exit 2 
+if (-not (Test-Path $dockerExe)) {
+    Write-Step "Docker executable not found at $dockerExe"
+    exit 2
 }
-Write-Host "Starting Docker Desktop"
-Start-Process -FilePath $dockerExe
 
-# Wait for docker-desktop to start (max 90 seconds)
-$maxWait = 90
-$elapsed = 0
-$started = $false
-while ($elapsed -lt $maxWait) {
-    $list = wsl --list --verbose 2>$null
-    if ($list -match "docker-desktop\s+Running") { 
-        $started = $true
-        break 
+Write-Step "Starting Docker Desktop"
+
+if (Test-IsAdministrator) {
+    try {
+        Start-Service -Name 'com.docker.service' -ErrorAction Stop
+        Write-Step "Docker service start requested from an elevated session."
+    } catch {
+        Write-Step "Could not start com.docker.service directly: $($_.Exception.Message)"
     }
+
+    Start-Process -FilePath $dockerExe
+} else {
+    Start-DockerDesktop -DockerExePath $dockerExe
+}
+
+$elapsed = 0
+while ($elapsed -lt $StartTimeoutSeconds) {
     Start-Sleep -Seconds 3
     $elapsed += 3
-}
-if (-not $started) { 
-    Write-Host "Docker failed to start within $maxWait seconds" -ForegroundColor Red
-    exit 3 
+
+    if (Test-DockerResponsive) {
+        Write-Step "Docker is responding"
+        Write-Step "Docker cleanup complete"
+        exit 0
+    }
 }
 
-# Test docker daemon
-Start-Sleep -Seconds 2
-try {
-    docker version 2>$null | Out-Null
-    Write-Host "Docker is responding"
-} catch {
-    Write-Host "Docker not responding yet" -ForegroundColor Yellow
-}
-
-Write-Host "== Docker cleanup complete =="
-exit 0
+Write-Step "Docker Desktop started, but the daemon did not respond within $StartTimeoutSeconds seconds."
+exit 3

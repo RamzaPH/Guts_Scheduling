@@ -157,3 +157,24 @@ Bash:
 ```bash
 ./scripts/restart-stack.sh --no-build
 ```
+
+## 7) Permanent Docker Fix on Windows
+
+If Docker Desktop keeps coming back with lingering processes after shutdown or restart, install the automatic logon repair once:
+
+```powershell
+.\scripts\install-docker-autofix.ps1
+```
+
+What it does:
+
+- Registers a Windows Run entry for your user so the cleanup runs at logon.
+- Clears stale Docker Desktop, com.docker.build, and backend processes.
+- Leaves Docker stopped so you can launch it cleanly after the stale processes are cleared.
+- Avoids the destructive WSL/config reset that the old rescue script used.
+
+If you just want to run the cleanup manually, use:
+
+```powershell
+.\scripts\restart-docker.ps1
+```

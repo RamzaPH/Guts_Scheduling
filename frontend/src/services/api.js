@@ -17,6 +17,7 @@ function resolveApiBaseUrl() {
 const API_BASE_URL = resolveApiBaseUrl();
 const AUTH_KEY = "guts_auth";
 const UNAUTHORIZED_EVENT = "guts:unauthorized";
+const RETRYABLE_STATUS_CODES = new Set([502, 503, 504]);
 
 function getAuthToken() {
   try {
@@ -40,10 +41,31 @@ async function request(path, options = {}) {
     headers["Content-Type"] = "application/json";
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers,
-    ...options,
-  });
+  let response;
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        headers,
+        ...options,
+      });
+
+      if (!RETRYABLE_STATUS_CODES.has(response.status) || attempt === 1) {
+        break;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt === 1) {
+        break;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+
+  if (!response) {
+    throw new Error(lastError?.message || "Unable to reach the server. Please try again.");
+  }
 
   let payload = null;
   try {
