@@ -3,7 +3,7 @@ import { useToast } from "../../../shared/utils/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useStudentsList } from "./useStudentsList";
 import { deleteStudent, updateEnrollmentStatus, updateStudent } from "../services/studentsApi";
-import { getCourseCode, getEnrollmentLifecycleStatus, getEnrollmentPaymentSummary, getLatestEnrollment, mapStudentToEditForm } from "../utils/studentsPageUtils";
+import { getCourseCode, getEnrollmentLifecycleStatus, getEnrollmentPaymentSummary, getLatestEnrollment, getStudentSourceLabel, mapStudentToEditForm } from "../utils/studentsPageUtils";
 import {
   formatPromoScoreValue,
   formatScoreValue,
@@ -109,8 +109,10 @@ function getCompletionFlags(student) {
   const courseCode = getCourseCode(student);
   const enrollmentStatus = String(latestEnrollment?.status || "").toLowerCase();
   const parsed = parseScoreValue(latestEnrollment?.score);
+  const sourceLabel = getStudentSourceLabel(student || latestEnrollment?.Student);
 
   const isPromo = courseCode === "PROMO";
+  const isImportedTdc = sourceLabel === "SafeRoads.ph" || sourceLabel === "OTDC.ph";
   const promoTdcPassed = isPassedOutcome(parsed.promoTdcOutcome);
   const promoPdcPassed = isPassedOutcome(parsed.promoPdcOutcome);
   const promoFullyPassed = isPromo && promoTdcPassed && promoPdcPassed;
@@ -123,7 +125,7 @@ function getCompletionFlags(student) {
   }
 
   const nonPromoPassed = isPassedOutcome(parsed.outcome);
-  const nonPromoCompleted = enrollmentStatus === "completed";
+  const nonPromoCompleted = enrollmentStatus === "completed" && isImportedTdc;
 
   return {
     isPassed: nonPromoPassed,

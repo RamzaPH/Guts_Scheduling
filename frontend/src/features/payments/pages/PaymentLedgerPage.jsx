@@ -26,23 +26,35 @@ function resolveLedgerView(view) {
   return PAYMENT_LEDGER_VIEWS[String(view || "overall").toLowerCase()] || PAYMENT_LEDGER_VIEWS.overall;
 }
 
-function updateEnrollmentPromoSummary(enrollment, promoPrice, promoOfferId) {
+function mergeUniqueIds(existingIds = [], nextId) {
+  const merged = Array.isArray(existingIds) ? existingIds.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0) : [];
+  const numericId = Number(nextId);
+
+  if (Number.isInteger(numericId) && numericId > 0 && !merged.includes(numericId)) {
+    merged.push(numericId);
+  }
+
+  return merged;
+}
+
+function updateEnrollmentPromoSummary(enrollment, nextAdditionalAmount, nextAdditionalPromoOfferIds) {
   if (!enrollment) return enrollment;
 
   const previousAdditionalAmount = Number(enrollment.additional_promos_amount || 0);
-  const nextAdditionalAmount = Number((Number(promoPrice || 0)).toFixed(2));
   const baseFeeAmount = Math.max(Number(enrollment.fee_amount || 0) - previousAdditionalAmount, 0);
-  const nextIds = Number.isInteger(Number(promoOfferId)) && Number(promoOfferId) > 0 ? [Number(promoOfferId)] : (Array.isArray(enrollment.additional_promo_offer_ids) ? enrollment.additional_promo_offer_ids : []);
+  const nextIds = Array.isArray(nextAdditionalPromoOfferIds)
+    ? nextAdditionalPromoOfferIds
+    : mergeUniqueIds(enrollment.additional_promo_offer_ids, nextAdditionalPromoOfferIds);
 
   return {
     ...enrollment,
     additional_promo_offer_ids: nextIds,
-    additional_promos_amount: nextAdditionalAmount,
-    fee_amount: Number((baseFeeAmount + nextAdditionalAmount).toFixed(2)),
+    additional_promos_amount: Number((Number(nextAdditionalAmount || 0)).toFixed(2)),
+    fee_amount: Number((baseFeeAmount + Number(nextAdditionalAmount || 0)).toFixed(2)),
   };
 }
 
-function patchStudentsCollection(collection, row, promoPrice, promoOfferId) {
+function patchStudentsCollection(collection, row, nextAdditionalAmount, nextAdditionalPromoOfferIds) {
   const patchStudent = (student) => {
     if (String(student?.id) !== String(row?.student?.id)) {
       return student;
@@ -55,7 +67,7 @@ function patchStudentsCollection(collection, row, promoPrice, promoOfferId) {
           if (index !== 0 || String(item?.id) !== String(row?.enrollment?.id)) {
             return item;
           }
-          return updateEnrollmentPromoSummary(item, promoPrice, promoOfferId);
+          return updateEnrollmentPromoSummary(item, nextAdditionalAmount, nextAdditionalPromoOfferIds);
         });
 
         return {
@@ -103,6 +115,7 @@ function buildEnrollmentPromoLabels(enrollment, promoOfferRows = []) {
 
   const names = [];
   const offerMap = new Map((Array.isArray(promoOfferRows) ? promoOfferRows : []).map((offer) => [String(offer?.id), offer?.name]));
+  const additionalLabels = [];
 
   const pushUnique = (value) => {
     const text = String(value || "").trim();
@@ -120,14 +133,26 @@ function buildEnrollmentPromoLabels(enrollment, promoOfferRows = []) {
   }
 
   if (Array.isArray(enrollment?.additionalPromoOffers)) {
-    enrollment.additionalPromoOffers.forEach((offer) => pushUnique(offer?.name));
+    enrollment.additionalPromoOffers.forEach((offer) => {
+      const label = String(offer?.name || "").trim();
+      if (label && !additionalLabels.includes(label)) {
+        additionalLabels.push(label);
+      }
+    });
   }
 
   if (Array.isArray(enrollment?.additional_promo_offer_ids)) {
     enrollment.additional_promo_offer_ids.forEach((id) => {
       if (id === null || id === undefined || id === "") return;
-      pushUnique(offerMap.get(String(id)) || `Promo #${id}`);
+      const label = String(offerMap.get(String(id)) || `Promo #${id}`).trim();
+      if (label && !additionalLabels.includes(label)) {
+        additionalLabels.push(label);
+      }
     });
+  }
+
+  if (additionalLabels.length > 0) {
+    return additionalLabels;
   }
 
   return names;
@@ -176,11 +201,10 @@ export default function PaymentLedgerPage() {
         const enrollment = getLatestEnrollment(student);
         const sourceLabel = String(student?.source_channel || student?.external_source || student?.StudentProfile?.tdc_source || "").toLowerCase();
         const isImportedTdc = sourceLabel === "saferoads" || sourceLabel === "otdc";
+        const summary = getEnrollmentPaymentSummary(enrollment, student);
 
         if (!enrollment && !isImportedTdc) return null;
-        if (enrollment && String(enrollment.status || "").toLowerCase() === "pending" && !isImportedTdc) return null;
-
-        const summary = getEnrollmentPaymentSummary(enrollment, student);
+        if (enrollment && String(enrollment.status || "").toLowerCase() === "pending" && !isImportedTdc && summary.paymentStatus === "not_set") return null;
         const category = getPaymentCategoryLabel(enrollment);
         const course = getCourseCode(student);
 
@@ -248,8 +272,8 @@ export default function PaymentLedgerPage() {
     mutationFn: async ({ row, promoOffer, promoPrice, payNow }) => {
       setBanner("");
       const previousAdditionalAmount = Number(row.enrollment?.additional_promos_amount || 0);
-      const nextAdditionalAmount = Number(promoPrice || 0);
-      const nextIds = [Number(promoOffer.id)];
+      const nextIds = mergeUniqueIds(row.enrollment?.additional_promo_offer_ids, promoOffer.id);
+      const nextAdditionalAmount = Number((previousAdditionalAmount + Number(promoPrice || 0)).toFixed(2));
       const delta = Number((nextAdditionalAmount - previousAdditionalAmount).toFixed(2));
 
       await resourceServices.enrollments.update(row.enrollment.id, {
@@ -271,10 +295,10 @@ export default function PaymentLedgerPage() {
       setPromoTarget(null);
 
       queryClient.setQueryData(["students", "payment-ledger", view], (current) =>
-        patchStudentsCollection(current, row, promoPrice, promoOffer.id)
+        patchStudentsCollection(current, row, Number(row.enrollment?.additional_promos_amount || 0) + Number(promoPrice || 0), mergeUniqueIds(row.enrollment?.additional_promo_offer_ids, promoOffer.id))
       );
       queryClient.setQueryData(["students"], (current) =>
-        patchStudentsCollection(current, row, promoPrice, promoOffer.id)
+        patchStudentsCollection(current, row, Number(row.enrollment?.additional_promos_amount || 0) + Number(promoPrice || 0), mergeUniqueIds(row.enrollment?.additional_promo_offer_ids, promoOffer.id))
       );
 
       await queryClient.invalidateQueries({ queryKey: ["students"] });
@@ -288,7 +312,11 @@ export default function PaymentLedgerPage() {
               remainingBalance: nextRemainingBalance,
               totalDue: nextTotalDue,
             },
-            enrollment: updateEnrollmentPromoSummary(row.enrollment, promoPrice, promoOffer.id),
+            enrollment: updateEnrollmentPromoSummary(
+              row.enrollment,
+              Number(row.enrollment?.additional_promos_amount || 0) + Number(promoPrice || 0),
+              mergeUniqueIds(row.enrollment?.additional_promo_offer_ids, promoOffer.id)
+            ),
           });
           setBanner(`Promo added and ready for payment: PHP ${promoPrice.toFixed(2)}.`);
         } else {

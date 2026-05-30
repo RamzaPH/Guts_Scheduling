@@ -73,7 +73,7 @@ function isDateAllowedForCourse(date, courseFilter) {
   }
 
   if (normalized === "pdc" || normalized === "pdc_beginner" || normalized === "pdc_experience") {
-    return day >= 1 && day <= 4;
+    return day >= 1 && day <= 6;
   }
 
   return true;
@@ -215,7 +215,7 @@ export default function CalendarWidget({
           const isSelected = selectedDate ? isSameDay(current, selectedDate) : false;
           const isInRange = isInActiveRange(current);
           const isPast = isPastDate(current);
-          const isAllowed = isDateAllowedForCourse(current, courseFilter) && !isHoliday;
+          const isAllowed = isDateAllowedForCourse(current, courseFilter);
           const isoDate = `${view.year}-${String(view.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const dayStatus = monthStatusMap.get(isoDate);
           const isFull = Boolean(dayStatus?.dayFull);
@@ -278,7 +278,7 @@ export default function CalendarWidget({
           Source: {holidaySource === "api" ? "Nager public holidays API" : "Local fallback list"}
         </p>
         <p className="mt-1 text-[10px] font-medium text-emerald-700/90">
-          Legal holidays are disabled for enrollment.
+          Legal holidays are clickable for scheduling.
         </p>
         {monthHolidayEntries.length > 0 ? (
           <ul className="mt-1 space-y-0.5">

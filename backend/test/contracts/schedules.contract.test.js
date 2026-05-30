@@ -243,6 +243,75 @@ test.describe("Schedules API contract", () => {
     cleanup.scheduleIds.push(response.body.data.item.id);
   });
 
+  test("POST /api/schedules allows repeated TDC instructor usage while capacity remains", async () => {
+    const scheduleDate = nextWeekdayIso(1, 6); // Monday
+    const { instructor } = await createScheduleDependencies({
+      courseName: "TDC",
+      specialization: "TDC Certified",
+      tdcCertified: true,
+    });
+
+    const first = await client
+      .post("/api/schedules")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        course_type: "tdc",
+        instructor_id: instructor.id,
+        vehicle_id: null,
+        schedule_date: scheduleDate,
+        slot: "morning",
+        remarks: "First TDC booking",
+      });
+
+    const second = await client
+      .post("/api/schedules")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        course_type: "tdc",
+        instructor_id: instructor.id,
+        vehicle_id: null,
+        schedule_date: scheduleDate,
+        slot: "morning",
+        remarks: "Second TDC booking",
+      });
+
+    assert.equal(first.status, 201, JSON.stringify(first.body));
+    assert.equal(second.status, 201, JSON.stringify(second.body));
+
+    cleanup.scheduleIds.push(first.body.data.item.id, second.body.data.item.id);
+  });
+
+  test("POST /api/schedules allows bookings on configured holidays", async () => {
+    const { instructor } = await createScheduleDependencies({
+      courseName: "TDC",
+      specialization: "TDC Certified",
+      tdcCertified: true,
+    });
+    const holidayDate = nextWeekdayIso(2, 7);
+    const originalHolidays = process.env.SCHEDULE_HOLIDAYS || "";
+
+    process.env.SCHEDULE_HOLIDAYS = holidayDate;
+
+    try {
+      const response = await client
+        .post("/api/schedules")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          course_type: "tdc",
+          instructor_id: instructor.id,
+          vehicle_id: null,
+          schedule_date: holidayDate,
+          slot: "morning",
+          remarks: "Holiday booking",
+        });
+
+      assert.equal(response.status, 201, JSON.stringify(response.body));
+      cleanup.scheduleIds.push(response.body.data.item.id);
+    } finally {
+      process.env.SCHEDULE_HOLIDAYS = originalHolidays;
+    }
+  });
+
   test("POST /api/schedules links selected enrollment and student with inferred course type", async () => {
     const { instructor, vehicle } = await createScheduleDependencies({
       courseName: "PDC Beginner",

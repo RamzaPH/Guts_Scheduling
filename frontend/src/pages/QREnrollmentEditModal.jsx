@@ -22,6 +22,17 @@ export default function QREnrollmentEditModal({ isOpen, enrollment, onClose, onS
   ).trim().toUpperCase();
   const isPdcEnrollment = enrollmentType === "PDC";
   const isPromoEnrollment = enrollmentType === "PROMO";
+  const tdcDesiredDate = enrollment?.tdc_completion_deadline
+    || enrollment?.promo_schedule_tdc?.schedule_date
+    || "";
+  const pdcDesiredDate = enrollment?.pdc_desired_date
+    || enrollment?.promo_schedule_pdc?.schedule_date
+    || "";
+  const pdcDesiredSlotLabel = enrollment?.pdc_desired_time_slot === "morning"
+    ? "Morning (AM)"
+    : enrollment?.pdc_desired_time_slot === "afternoon"
+      ? "Afternoon (PM)"
+      : enrollment?.pdc_desired_time_slot || "";
   const [form, setForm] = useState({
     promo_schedule_tdc: {
       schedule_date: "",
@@ -83,13 +94,13 @@ export default function QREnrollmentEditModal({ isOpen, enrollment, onClose, onS
     Promise.resolve().then(() => {
       setForm({
         promo_schedule_tdc: {
-          schedule_date: enrollment?.promo_schedule_tdc?.schedule_date || "",
+          schedule_date: tdcDesiredDate,
           instructor_id: enrollment?.promo_schedule_tdc?.instructor_id || null,
           care_of_instructor_id: enrollment?.promo_schedule_tdc?.care_of_instructor_id || null,
         },
         promo_schedule_pdc: {
           enabled: isPdcEnrollment || enrollment?.promo_schedule_pdc?.enabled ? "Schedule Now" : "Schedule Later",
-          schedule_date: enrollment?.promo_schedule_pdc?.schedule_date || "",
+          schedule_date: pdcDesiredDate,
           instructor_id: enrollment?.promo_schedule_pdc?.instructor_id || null,
           care_of_instructor_id: enrollment?.promo_schedule_pdc?.care_of_instructor_id || null,
         },
@@ -105,7 +116,7 @@ export default function QREnrollmentEditModal({ isOpen, enrollment, onClose, onS
       });
       setErrorMessage("");
     });
-  }, [isOpen, enrollment, isPdcEnrollment]);
+  }, [isOpen, enrollment, isPdcEnrollment, pdcDesiredDate, tdcDesiredDate]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -290,6 +301,12 @@ export default function QREnrollmentEditModal({ isOpen, enrollment, onClose, onS
             {!isPdcEnrollment ? (
               <section>
                 <h3 className="mb-4 text-sm font-semibold text-slate-900">TDC Schedule Session</h3>
+                {tdcDesiredDate ? (
+                  <div className="mb-3 rounded-xl border border-[#d9c9a0] bg-[#fffaf0] px-3 py-2 text-xs text-slate-700">
+                    <div className="font-semibold text-[#800000]">Public request</div>
+                    <div>Desired Date: {tdcDesiredDate}</div>
+                  </div>
+                ) : null}
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="flex flex-col gap-1">
                     <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">Desired Date *</span>
@@ -337,6 +354,17 @@ export default function QREnrollmentEditModal({ isOpen, enrollment, onClose, onS
               <section>
                 <h3 className="mb-4 text-sm font-semibold text-slate-900">PDC Schedule Session</h3>
                 <div className="space-y-3">
+                  {(enrollment?.pdc_desired_date || enrollment?.pdc_desired_time_slot) ? (
+                    <div className="rounded-xl border border-[#d9c9a0] bg-[#fffaf0] px-3 py-2 text-xs text-slate-700">
+                      <div className="font-semibold text-[#800000]">Public request</div>
+                      <div>
+                        Desired Date: {enrollment?.pdc_desired_date || "-"}
+                      </div>
+                      <div>
+                        Desired Time Slot: {pdcDesiredSlotLabel || "-"}
+                      </div>
+                    </div>
+                  ) : null}
                   <label className="flex flex-col gap-1">
                     <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">Desired Date *</span>
                     <input
@@ -414,6 +442,13 @@ export default function QREnrollmentEditModal({ isOpen, enrollment, onClose, onS
 
                 {schedulePdcNow ? (
                   <div className="space-y-3">
+                    {pdcDesiredDate ? (
+                      <div className="rounded-xl border border-[#d9c9a0] bg-[#fffaf0] px-3 py-2 text-xs text-slate-700">
+                        <div className="font-semibold text-[#800000]">Public request</div>
+                        <div>Desired Date: {pdcDesiredDate}</div>
+                        <div>Desired Time Slot: {pdcDesiredSlotLabel || "-"}</div>
+                      </div>
+                    ) : null}
                     <label className="flex flex-col gap-1">
                       <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">Desired Date *</span>
                       <input

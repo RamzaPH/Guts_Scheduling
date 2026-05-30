@@ -215,7 +215,8 @@ function getAutoZipCode(formData) {
 }
 
 function normalizeBooleanValue(value) {
-  return value === true || value === "true";
+  const normalized = String(value || "").trim().toLowerCase();
+  return value === true || normalized === "true" || normalized === "yes";
 }
 
 function formatMoney(value) {
@@ -243,6 +244,7 @@ function buildPromoOption(offer) {
   return {
     value: String(offer.id),
     label: `${offer.name}${priceLabel}`,
+    is_applicable: Boolean(offer?.is_applicable),
   };
 }
 
@@ -318,6 +320,21 @@ export default function PublicEnrollPage() {
   const [selectedPromos, setSelectedPromos] = useState([]);
   const [promoConfirmed, setPromoConfirmed] = useState(false);
 
+  function resetForAnotherResponse() {
+    setFormData({});
+    setStatus("");
+    setSubmitState("idle");
+    setShowPromoPrompt(false);
+    setWantsPromo(null);
+    setSelectedPromos([]);
+    setPromoConfirmed(false);
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      // no-op for environments that do not support smooth scroll
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -344,7 +361,14 @@ export default function PublicEnrollPage() {
           const promoResponse = await fetch(`/api/enroll/promo-offers?token=${encodeURIComponent(token)}`);
           const promoData = await readApiBody(promoResponse);
           if (promoResponse.ok && Array.isArray(promoData)) {
-            loadedPromoOptions = promoData.map(buildPromoOption);
+            const effectiveEnrollmentType = resolveQrEnrollmentType(data.template);
+            loadedPromoOptions = promoData
+              .map(buildPromoOption)
+              .filter((offer) => {
+                if (!offer) return false;
+                if (!effectiveEnrollmentType) return Boolean(offer.is_applicable);
+                return Boolean(offer.is_applicable);
+              });
           }
         } catch {
           loadedPromoOptions = [];
@@ -464,15 +488,14 @@ export default function PublicEnrollPage() {
         is_already_driver: normalizeBooleanValue(formData.enrollment?.is_already_driver),
         enrollment_channel: "qr_public",
       },
-      promo_schedule_pdc: {
-        ...(formData.promo_schedule_pdc || {}),
-        enabled: false,
-        schedule_date: "",
-        slot: "morning",
-        instructor_id: null,
-        care_of_instructor_id: null,
-        vehicle_id: null,
-      },
+      schedule:
+        (template?.enrollment_type || formData.enrollment_type) === "PDC" || (template?.enrollment_type || formData.enrollment_type) === "TDC"
+          ? {
+              ...(formData.schedule || {}),
+              enabled: false,
+              slot: formData.schedule?.slot || "morning",
+            }
+          : undefined,
       promo_schedule:
         (template?.enrollment_type || formData.enrollment_type) === "PROMO"
           ? {
@@ -500,6 +523,18 @@ export default function PublicEnrollPage() {
         setStatus("Please provide the desired TDC date.");
         return null;
       }
+    }
+
+    if (payload.enrollment_type === "TDC" && !payload.schedule?.schedule_date) {
+      setSubmitState("idle");
+      setStatus("Please provide the desired TDC date.");
+      return null;
+    }
+
+    if (payload.enrollment_type === "PDC" && !payload.schedule?.schedule_date) {
+      setSubmitState("idle");
+      setStatus("Please provide the desired PDC date.");
+      return null;
     }
 
     return payload;
@@ -536,7 +571,11 @@ export default function PublicEnrollPage() {
     const effectiveEnrollmentType = resolveQrEnrollmentType(template);
 
     for (const section of sourceSections) {
-      if ((effectiveEnrollmentType === "TDC" || effectiveEnrollmentType === "PDC") && (section.title === "DRIVING INFORMATION" || section.title === "Schedule Session")) {
+      if (effectiveEnrollmentType === "TDC" && (section.title === "DRIVING INFORMATION" || section.title === "Schedule Session")) {
+        continue;
+      }
+
+      if (effectiveEnrollmentType === "PDC" && section.title === "DRIVING INFORMATION") {
         continue;
       }
 
@@ -636,7 +675,7 @@ export default function PublicEnrollPage() {
             </div>
           ) : null}
 
-          {!loading ? (
+          {!loading && submitState !== "done" ? (
             <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
               {sections.map((section) => {
                 let fieldsToRender = section.fields || [];
@@ -699,6 +738,29 @@ export default function PublicEnrollPage() {
                 </button>
               </div>
             </form>
+          ) : null}
+
+          {!loading && submitState === "done" ? (
+            <div className="mt-8 rounded-[28px] border border-emerald-200 bg-emerald-50/60 p-8 text-center card-light">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Enrollment Complete</p>
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                Your enrollment has been recorded.
+              </h2>
+              <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+                Thank you. Your submission is now in the review queue. You may submit another response for a new enrollment.
+              </p>
+              <p className="mx-auto mt-3 max-w-2xl rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                Encoder/staff will assign the instructor, time slot, and final schedule details after review.
+              </p>
+
+              <button
+                type="button"
+                onClick={resetForAnotherResponse}
+                className="mt-6 text-sm font-medium text-sky-700 underline underline-offset-2 transition hover:text-sky-800"
+              >
+                Submit Another Response
+              </button>
+            </div>
           ) : null}
 
           {/* Promo confirmation modal shown when user hits submit */}

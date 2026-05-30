@@ -7,13 +7,16 @@ const clientTypeOptions = [
 const genderOptions = ["Male", "Female", "Prefer not to say"];
 const civilStatusOptions = ["Single", "Married", "Separated", "Widowed"];
 const nationalityOptions = ["Filipino", "Foreign", "Others"];
-const educationalAttainmentOptions = ["College", "High School", "Elementary", "Post Graduate", "Vocational", "Informal Schooling", "Other"];
 const enrollingForOptions = [
   "Theoretical Driving Course (TDC 15 hrs Lecture/Seminar) - FOR STUDENT PERMIT APPLICATION",
   "DEFENSIVE DRIVING SEMINAR (WITH NON PRO/ PRO LICENSE)",
 ];
 const pdcClassificationOptions = ["Beginner", "Experience"];
-const yesNoOptions = ["true", "false"];
+const yesNoOptions = ["Yes", "No"];
+const pdcTimeSlotOptions = [
+  { value: "morning", label: "Morning (AM)" },
+  { value: "afternoon", label: "Afternoon (PM)" },
+];
 const pdcVehicleTypeOptions = [
   "DL Codes A - Motorcycle (2 wheels)",
   "DL Codes A1 - Tricycle (3 wheels)",
@@ -60,11 +63,12 @@ const commonPersonalInfoSection = [
   { name: "profile.birthdate", label: "BIRTHDAY", type: "date", required: true },
   textField("profile.birthplace", "BIRTHPLACE", true),
   textField("profile.age", "AGE", false, { readOnly: true }),
-  textField("profile.gmail_account", "GMAIL / YMAIL ACCOUNT", true),
+  textField("profile.gmail_account", "EMAIL (Gmail, Yahoo Mail, etc.)", true),
   selectField("profile.nationality", "NATIONALITY", nationalityOptions, true),
   selectField("profile.gender", "GENDER", genderOptions, true),
   selectField("profile.civil_status", "MARITAL STATUS", civilStatusOptions, true),
   textField("student.phone", "CONTACT NUMBER", true),
+  textField("extras.lto_portal_account", "LTO/LTMS CLIENT ID", true),
 ];
 
 const commonAddressSection = [
@@ -78,10 +82,8 @@ const commonAddressSection = [
 ];
 
 const commonEmergencySection = [
-  selectField("extras.educational_attainment", "EDUCATIONAL ATTAINMENT", educationalAttainmentOptions, false),
-  textField("extras.emergency_contact_person", "EMERGENCY CONTACT PERSON", false),
-  textField("extras.emergency_contact_number", "EMERGENCY CONTACT NUMBER", false),
-  textField("extras.lto_portal_account", "LTO/LTMS PORTAL ACCOUNT", false),
+  textField("extras.emergency_contact_person", "EMERGENCY CONTACT PERSON", true),
+  textField("extras.emergency_contact_number", "EMERGENCY CONTACT NUMBER", true),
 ];
 
 const templatesByType = {
@@ -97,6 +99,9 @@ const templatesByType = {
       section("COURSE INFORMATION", "Select the enrollment purpose for this TDC intake.", [
         selectField("extras.enrolling_for", "ENROLLING FOR", enrollingForOptions, true),
       ]),
+      section("TDC Schedule Session", "Enter your preferred date. Encoder/staff will finalize the schedule details after review.", [
+        dateField("schedule.schedule_date", "Desired Date", true),
+      ]),
     ],
   },
   PDC: {
@@ -111,8 +116,12 @@ const templatesByType = {
       section("COURSE INFORMATION", "Pick the PDC track and related training details.", [
         selectField("extras.enrolling_for", "ENROLLING FOR", promoPdcEnrollingForOptions, true),
         selectField("enrollment.pdc_category", "PDC CLASSIFICATION", pdcClassificationOptions, true),
-        selectField("enrollment.is_already_driver", "MARUNONG KA NA BANG MAGMANEHO?", yesNoOptions, false),
+        selectField("enrollment.is_already_driver", "MARUNONG KA NA BANG MAGMANEHO, MANEUVERING/PARKING?", yesNoOptions, false),
         selectField("enrollment.target_vehicle", "ANONG SASAKYAN ANG IMAMANEHO?", pdcVehicleTypeOptions, false),
+      ]),
+      section("PDC Schedule Session", "Enter the desired first date and time slot for the PDC intake. The next day will follow the same slot for consecutive-day scheduling.", [
+        dateField("schedule.schedule_date", "Desired Date", true),
+        selectField("schedule.slot", "Desired Time Slot", pdcTimeSlotOptions, true),
       ]),
     ],
   },

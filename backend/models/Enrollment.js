@@ -89,6 +89,14 @@ module.exports = (sequelize) => {
 			type: DataTypes.DATEONLY,
 			allowNull: true,
 		},
+		pdc_desired_date: {
+			type: DataTypes.DATEONLY,
+			allowNull: true,
+		},
+		pdc_desired_time_slot: {
+			type: DataTypes.STRING,
+			allowNull: true,
+		},
 		pdc_valid_until: {
 			type: DataTypes.DATEONLY,
 			allowNull: true,

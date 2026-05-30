@@ -244,52 +244,59 @@ test.describe("Scheduling live verification matrix", () => {
     assert.match(String(response.body?.message || ""), /Second beginner session|non-operational|Monday to Thursday/i);
   });
 
-  test("Scenario 3: Experienced whole-day lock blocks same-resource booking", async () => {
-    const experiencedInstructor = await createInstructorForCourse("pdc_experience");
-    const vehicle = await createVehicle("ExperiencedVehicle");
+  test("Scenario 3: PDC Experience allows up to three bookings per day", async () => {
     const lockDate = nextWeekdayIso(2, 7); // Tuesday
+    const resources = await Promise.all([
+      createInstructorForCourse("pdc_experience").then((instructor) => createVehicle("ExperiencedVehicleA").then((vehicle) => ({ instructor, vehicle }))),
+      createInstructorForCourse("pdc_experience").then((instructor) => createVehicle("ExperiencedVehicleB").then((vehicle) => ({ instructor, vehicle }))),
+      createInstructorForCourse("pdc_experience").then((instructor) => createVehicle("ExperiencedVehicleC").then((vehicle) => ({ instructor, vehicle }))),
+      createInstructorForCourse("pdc_experience").then((instructor) => createVehicle("ExperiencedVehicleD").then((vehicle) => ({ instructor, vehicle }))),
+    ]);
 
-    const experiencedResponse = await client
+    const responses = [];
+    for (let index = 0; index < 3; index += 1) {
+      const { instructor, vehicle } = resources[index];
+      const response = await client
+        .post("/api/schedules")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          course_type: "pdc_experience",
+          instructor_id: instructor.id,
+          vehicle_id: vehicle.id,
+          schedule_date: lockDate,
+          slot: "morning",
+          remarks: `Matrix experience ${index + 1}`,
+        });
+      responses.push(response);
+    }
+
+    const fourthResponse = await client
       .post("/api/schedules")
       .set("Authorization", `Bearer ${token}`)
       .send({
         course_type: "pdc_experience",
-        instructor_id: experiencedInstructor.id,
-        vehicle_id: vehicle.id,
+        instructor_id: resources[3].instructor.id,
+        vehicle_id: resources[3].vehicle.id,
         schedule_date: lockDate,
         slot: "morning",
-        remarks: "Matrix experienced lock",
+        remarks: "Matrix experience 4",
       });
 
-    assert.equal(experiencedResponse.status, 201);
-    const createdItems = experiencedResponse.body.data?.createdItems || [];
-    assert.equal(createdItems.length, 2);
-    cleanup.scheduleIds.push(...createdItems.map((item) => item.id));
+    responses.forEach((response) => {
+      assert.equal(response.status, 201, JSON.stringify(response.body));
+      cleanup.scheduleIds.push(...(response.body.data?.createdItems || []).map((item) => item.id));
+    });
 
-    const beginnerInstructor = await createInstructorForCourse("pdc_beginner");
-
-    const conflictingResponse = await client
-      .post("/api/schedules")
-      .set("Authorization", `Bearer ${token}`)
-      .send({
-        course_type: "pdc_beginner",
-        instructor_id: beginnerInstructor.id,
-        vehicle_id: vehicle.id,
-        schedule_date: lockDate,
-        slot: "afternoon",
-        remarks: "Matrix conflict booking",
-      });
-
-    assert.equal(conflictingResponse.status, 400);
-    assert.match(String(conflictingResponse.body?.message || ""), /Resource unavailable|already has a booking|whole day|already assigned/i);
+    assert.equal(fourthResponse.status, 400, JSON.stringify(fourthResponse.body));
+    assert.match(String(fourthResponse.body?.message || ""), /No instructors available|time slot|Resource unavailable/i);
 
     const dayResponse = await client
-      .get(`/api/schedules/day?date=${lockDate}&course_type=pdc_beginner&instructor_id=${beginnerInstructor.id}&vehicle_id=${vehicle.id}`)
+      .get(`/api/schedules/day?date=${lockDate}&course_type=pdc_experience&instructor_id=${resources[0].instructor.id}&vehicle_id=${resources[0].vehicle.id}`)
       .set("Authorization", `Bearer ${token}`);
 
     assert.equal(dayResponse.status, 200);
-    const afternoon = dayResponse.body?.data?.slots?.find((slot) => slot.slot === "afternoon");
-    assert.equal(Boolean(afternoon?.full), true);
-    assert.match(String(afternoon?.fullLabel || ""), /Fully Booked|Resource Full/i);
+    const morning = dayResponse.body?.data?.slots?.find((slot) => slot.slot === "morning");
+    assert.equal(Boolean(morning?.full), true);
+    assert.match(String(morning?.fullLabel || ""), /Fully Booked|Resource Full/i);
   });
 });

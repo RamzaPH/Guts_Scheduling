@@ -1241,22 +1241,22 @@ export default function EnrollmentsPage() {
 
                 {scheduleCourseType === "tdc" ? (
                   <p className="mt-3 rounded-xl border border-[#d9c9a0] bg-white px-3 py-2 text-sm text-slate-700">
-                    TDC scheduling automatically reserves the same slot on two consecutive operating days (excluding Sundays and regular holidays). Maximum capacity: 30 students per session.
+                    TDC scheduling automatically reserves the same slot on two consecutive operating days. Holidays are schedulable again. Maximum capacity: 30 students per session.
                   </p>
                 ) : null}
 
                 {scheduleCourseType === "pdc_beginner" ? (
                   <p className="mt-3 rounded-xl border border-[#d9c9a0] bg-white px-3 py-2 text-sm text-slate-700">
-                    PDC scheduling is available Monday to Saturday only, excluding Sundays and regular holidays. Beginner scheduling automatically reserves the same slot on two consecutive operating days and only allows 1 student per slot.
+                    PDC scheduling is available Monday to Saturday only. Holidays are schedulable again. Beginner scheduling automatically reserves the same slot on two consecutive operating days and allows up to 2 groups per day.
                   </p>
                 ) : null}
 
                 {scheduleCourseType === "pdc_experience" ? (
                   <p className="mt-3 rounded-xl border border-[#d9c9a0] bg-white px-3 py-2 text-sm text-slate-700">
-                    PDC scheduling is available Monday to Saturday only, excluding Sundays and regular holidays.
+                    PDC scheduling is available Monday to Saturday only. Holidays are schedulable again.
                     {isMotorcycleWholeDaySchedule
                       ? "Motorcycle experience scheduling automatically reserves the whole day for the selected instructor and vehicle."
-                      : "Experience scheduling reserves the selected time slot for the selected instructor and vehicle."}
+                      : "Experience scheduling reserves the selected time slot for two consecutive days and allows up to 3 groups per day."}
                   </p>
                 ) : null}
               </div>

@@ -79,13 +79,15 @@ router.get("/enroll/promo-offers", async (req, res) => {
       is_applicable: !offer.applies_to || offer.applies_to === "ALL" || offer.applies_to === normalizedEnrollmentType,
     }));
 
-    // Sort: applicable offers first, then by name ascending for stable display
-    mapped.sort((a, b) => {
+    const applicableOffers = mapped.filter((offer) => offer.is_applicable);
+
+    // Sort by name ascending for stable display.
+    applicableOffers.sort((a, b) => {
       if (a.is_applicable === b.is_applicable) return String(a.name || "").localeCompare(String(b.name || ""));
       return a.is_applicable ? -1 : 1;
     });
 
-    res.json(mapped);
+    res.json(applicableOffers);
   } catch (err) {
     res.status(500).json({ error: err.message || "Failed to load promo offers" });
   }

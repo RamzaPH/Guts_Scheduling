@@ -30,16 +30,6 @@ const BEGINNER_AUTOMATION_TAG_PREFIX = "[AUTO_GROUP:";
 
 const NON_OPERATION_DAY_INDEX = new Set([0]); // Sunday
 
-function configuredHolidaySet() {
-  const raw = String(process.env.SCHEDULE_HOLIDAYS || "");
-  return new Set(
-    raw
-      .split(",")
-      .map((value) => value.trim())
-      .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
-  );
-}
-
 function addDaysToIsoDate(dateIso, daysToAdd) {
   const match = String(dateIso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
@@ -70,13 +60,9 @@ function getNextOperationalDay(startDateIso) {
     const dateObj = new Date(`${nextDate}T00:00:00`);
     const dayOfWeek = dateObj.getDay();
 
-    // Skip Sundays (day 0)
+    // Skip Sundays (day 0); holidays are now schedulable.
     if (dayOfWeek !== 0) {
-      // Check if date is a holiday
-      const holidays = configuredHolidaySet();
-      if (!holidays.has(nextDate)) {
-        return nextDate;
-      }
+      return nextDate;
     }
 
     currentDate = nextDate;
@@ -94,11 +80,6 @@ function evaluateOperationalDay(dateIso) {
 
   if (NON_OPERATION_DAY_INDEX.has(date.getDay())) {
     return { operational: false, reason: "No operations on Sundays" };
-  }
-
-  const holidays = configuredHolidaySet();
-  if (holidays.has(dateIso)) {
-    return { operational: false, reason: "Holiday" };
   }
 
   return { operational: true, reason: "Operational day" };
@@ -163,18 +144,34 @@ function validateBeginnerSecondDay(startDateIso) {
     operational: status.operational,
     reason: status.reason,
     message: status.operational
-      ? "Second beginner session date is operational"
-      : `Second beginner session (${secondDateIso}) falls on a non-operational day (${status.reason}). Pick another starting date.`,
+      ? "Second session date is operational"
+      : `Second session (${secondDateIso}) falls on a non-operational day (${status.reason}). Pick another starting date.`,
   };
 }
 
-function buildSchedulePlan(courseType, startDateIso, preferredSlot) {
+function isMotorcycleTarget(targetVehicle) {
+  const normalized = String(targetVehicle || "").trim().toLowerCase();
+  return (
+    normalized.includes("motorcycle") ||
+    normalized.includes("tricycle") ||
+    normalized.includes("dl codes a")
+  );
+}
+
+function buildSchedulePlan(courseType, startDateIso, preferredSlot, schedulePayload = {}) {
   const normalizedType = normalizeCourseType(courseType);
 
   if (normalizedType === "pdc_experience") {
+    const secondDate = isMotorcycleTarget(schedulePayload.target_vehicle)
+      ? null
+      : addDaysToIsoDate(startDateIso, 1);
     return [
       { date: startDateIso, slot: "morning" },
       { date: startDateIso, slot: "afternoon" },
+      ...(secondDate ? [
+        { date: secondDate, slot: "morning" },
+        { date: secondDate, slot: "afternoon" },
+      ] : []),
     ];
   }
 
@@ -334,37 +331,31 @@ async function validateSchedulePlanResources({
   }
 
   const rowsMap = new Map(dates.map((date, index) => [date, existingRowsByDate[index] || []]));
+  const skipInstructorConflicts = normalizedType === "tdc";
 
   for (const item of plan) {
     const slotConfig = SLOT_MAP[item.slot];
     const rows = rowsMap.get(item.date) || [];
     const inSameSlot = rows.filter((row) => row.start_time === slotConfig.startTime && row.end_time === slotConfig.endTime);
 
-    if (rows.some((row) => row.instructor_id === instructorId || row.care_of_instructor_id === instructorId)) {
-      const error = new Error("Resource unavailable for the selected dates/slots.");
-      error.status = 400;
-      throw error;
-    }
-
-    if (careOfInstructorId && rows.some((row) => row.instructor_id === careOfInstructorId || row.care_of_instructor_id === careOfInstructorId)) {
-      const error = new Error("Resource unavailable for the selected dates/slots.");
-      error.status = 400;
-      throw error;
-    }
-
-    if (requiresVehicle && vehicleId && rows.some((row) => row.vehicle_id === vehicleId)) {
-      const error = new Error("Resource unavailable for the selected dates/slots.");
-      error.status = 400;
-      throw error;
-    }
-
-    if (normalizedType === "pdc_experience") {
-      if (rows.some((row) => matchesCourseType(row, "pdc_experience"))) {
-        const error = new Error("PDC Experience is already booked for the whole day");
+    if (!skipInstructorConflicts) {
+      if (rows.some((row) => row.instructor_id === instructorId || row.care_of_instructor_id === instructorId)) {
+        const error = new Error("Resource unavailable for the selected dates/slots.");
         error.status = 400;
         throw error;
       }
-      continue;
+
+      if (careOfInstructorId && rows.some((row) => row.instructor_id === careOfInstructorId || row.care_of_instructor_id === careOfInstructorId)) {
+        const error = new Error("Resource unavailable for the selected dates/slots.");
+        error.status = 400;
+        throw error;
+      }
+
+      if (requiresVehicle && vehicleId && rows.some((row) => row.vehicle_id === vehicleId)) {
+        const error = new Error("Resource unavailable for the selected dates/slots.");
+        error.status = 400;
+        throw error;
+      }
     }
 
     let qualifiedInstructorCount = await repository.countQualifiedInstructors(courseType);
@@ -448,13 +439,11 @@ function capacityByCategory(courseType, instructorCount, vehicleCount) {
   const normalizedType = normalizeCourseType(courseType);
 
   if (normalizedType === "pdc_experience") {
-    // 1 dedicated Experience instructor; vehicle conflicts are enforced per-booking separately
-    return instructorCount > 0 ? 1 : 0;
+    return instructorCount > 0 ? 3 : 0;
   }
 
   if (normalizedType === "pdc_beginner") {
-    // PDC beginner is strictly 1 student per slot
-    return instructorCount > 0 ? 1 : 0;
+    return instructorCount > 0 ? 2 : 0;
   }
 
   if (normalizedType === "tdc") {
@@ -632,9 +621,9 @@ async function getSlotAvailability(date, slot, courseType = "overall", resourceF
   if (normalizedType === "pdc_experience") {
     const experienceRows = validDaySchedules.filter((row) => matchesCourseType(row, "pdc_experience"));
     const capacity = capacityByCategory("pdc_experience", qualifiedInstructorCount, vehicleCount);
-    const booked = experienceRows.length > 0 ? 1 : 0;
+    const booked = experienceRows.length;
     const resourceBlocked = validDaySchedules.some((row) => rowMatchesResourceFilter(row, resourceFilter));
-    const full = capacity <= 0 || booked >= 1 || resourceBlocked;
+    const full = capacity <= 0 || booked >= capacity || resourceBlocked;
 
     return {
       slot,
@@ -730,9 +719,8 @@ async function listMonthStatus(year, month) {
     repository.countQualifiedInstructors("pdc_experience"),
   ]);
 
-  // PDC beginner is strictly 1 student per slot
-  const beginnerCapacity = beginnerInstructorCount > 0 ? 1 : 0;
-  const experienceCapacity = experienceInstructorCount > 0 ? 1 : 0;
+  const beginnerCapacity = capacityByCategory("pdc_beginner", beginnerInstructorCount, 0);
+  const experienceCapacity = capacityByCategory("pdc_experience", experienceInstructorCount, 0);
 
   const grouped = new Map();
 
@@ -743,12 +731,12 @@ async function listMonthStatus(year, month) {
 
     const key = row.schedule_date;
     if (!grouped.has(key)) {
-      grouped.set(key, { morningBeginner: 0, afternoonBeginner: 0, experienceBooked: false });
+      grouped.set(key, { morningBeginner: 0, afternoonBeginner: 0, experienceBooked: 0 });
     }
 
     const rowCourseType = scheduleCourseType(row);
     if (rowCourseType === "pdc_experience") {
-      grouped.get(key).experienceBooked = true;
+      grouped.get(key).experienceBooked += 1;
       return;
     }
 
@@ -765,7 +753,7 @@ async function listMonthStatus(year, month) {
   return Array.from(grouped.entries()).map(([date, counts]) => {
     const morningBeginnerFull = beginnerCapacity <= 0 || counts.morningBeginner >= beginnerCapacity;
     const afternoonBeginnerFull = beginnerCapacity <= 0 || counts.afternoonBeginner >= beginnerCapacity;
-    const experienceFull = experienceCapacity <= 0 || counts.experienceBooked;
+    const experienceFull = experienceCapacity <= 0 || counts.experienceBooked >= experienceCapacity;
     return {
       date,
       morningFull: morningBeginnerFull && experienceFull,
@@ -877,6 +865,15 @@ async function addSchedule(payload, options = {}) {
       }
     }
 
+    if (effectiveCourseType === "pdc_experience" && !isMotorcycleTarget(payload.target_vehicle)) {
+      const secondDayCheck = validateBeginnerSecondDay(payload.schedule_date);
+      if (!secondDayCheck.operational) {
+        const error = new Error(secondDayCheck.message);
+        error.status = 400;
+        throw error;
+      }
+    }
+
     const capacity = allowPendingAssignment ? 1 : capacityByCategory(effectiveCourseType, qualifiedInstructorCount, vehicleCount);
     if (!capacity) {
       const error = new Error(
@@ -926,13 +923,6 @@ async function addSchedule(payload, options = {}) {
     ]);
 
     if (effectiveCourseType === "pdc_experience") {
-      const experienceSchedules = existingInDay.filter((row) => matchesCourseType(row, "pdc_experience"));
-      if (experienceSchedules.length >= 1) {
-        const error = new Error("PDC Experience is already booked for the whole day");
-        error.status = 400;
-        throw error;
-      }
-
       if (existingInDay.some((row) => row.instructor_id === payload.instructor_id)) {
         const error = new Error("Selected instructor already has a booking on this date");
         error.status = 400;
@@ -946,7 +936,7 @@ async function addSchedule(payload, options = {}) {
       }
     }
 
-    if (!options.skipSlotConflictChecks) {
+    if (!options.skipSlotConflictChecks && effectiveCourseType !== "tdc") {
       const categoryBookingsInSlot = existingInSlot.filter((row) => matchesCourseType(row, effectiveCourseType));
       if (categoryBookingsInSlot.length >= capacity) {
         const error = new Error("No instructors available for this category and time slot.");
@@ -967,7 +957,7 @@ async function addSchedule(payload, options = {}) {
       }
     }
 
-    const plan = buildSchedulePlan(effectiveCourseType, payload.schedule_date, payload.slot);
+    const plan = buildSchedulePlan(effectiveCourseType, payload.schedule_date, payload.slot, payload);
     if (!options.skipResourceValidation) {
       await validateSchedulePlanResources({
         plan,

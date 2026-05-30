@@ -154,8 +154,12 @@ export function getDisplayStatusLabel(courseCode, scoreValue, enrollmentStatus =
     return parsed.outcome;
   }
 
-  if (normalizedStatus === "completed" || isImportedTdc) {
+  if (isImportedTdc) {
     return "PASSED";
+  }
+
+  if (normalizedStatus === "completed") {
+    return "COMPLETED";
   }
 
   return "NOT SET";

@@ -243,6 +243,47 @@ function InstructorScheduleCards({
   );
 }
 
+function DailyEnrollmentCards({ entries }) {
+  if (!entries.length) {
+    return null;
+  }
+
+  return (
+    <section className="mb-4 rounded-[18px] border border-[#d7c58f] bg-[#fff8e8] p-3 md:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#5a1717]">Daily Enrollments</p>
+          <p className="text-[12px] text-slate-600">Public QR and enrollment-page submissions for the selected date.</p>
+        </div>
+        <span className="rounded-full bg-[#efe4c8] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-900">
+          {entries.length} entries
+        </span>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {entries.map((entry) => (
+          <article key={entry.id} className="rounded-2xl border border-[#cbb981] bg-[#eadfbe] p-4 text-[13px] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.42)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#5a1717]">{entry.transactionType || "Enrollment"}</p>
+            <p className="mt-2 text-[15px] font-semibold leading-snug text-slate-900">{entry.studentName || "-"}</p>
+            <div className="mt-2 space-y-1 text-[13px] leading-[1.45] text-slate-900">
+              <p><span className="font-medium">Course:</span> {entry.course || "-"}</p>
+              <p><span className="font-medium">Instructor:</span> {entry.instructor || "-"}</p>
+              <p><span className="font-medium">Care Of:</span> {entry.careOf || "-"}</p>
+              <p><span className="font-medium">Vehicle:</span> {entry.vehicleType || "-"}</p>
+              <p><span className="font-medium">Slot:</span> {entry.slotLabel || "-"}</p>
+            </div>
+            {entry.remarks ? (
+              <p className="mt-3 rounded-xl border border-[#cbb981] bg-[#f4ebcf] px-3 py-2 text-[12px] text-slate-700">
+                {entry.remarks}
+              </p>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function EmptySlotCard() {
   return (
     <div className="rounded-xl border border-dashed border-[#c9b57f] bg-[#efe4c8] px-3 py-6 text-center text-sm text-slate-700">
@@ -513,6 +554,11 @@ export default function CalendarScheduleModal({
     );
   }, [data]);
 
+  const dailyEnrollmentEntries = useMemo(() => {
+    const items = Array.isArray(data?.items) ? data.items : [];
+    return items.filter((item) => String(item?.transactionType || "").toLowerCase().includes("enrollment"));
+  }, [data]);
+
   const instructorGroups = useMemo(() => groupByInstructor(allSchedules), [allSchedules]);
 
   function updateDraft(draftKey, value) {
@@ -630,17 +676,20 @@ export default function CalendarScheduleModal({
             ) : null}
 
             {!isLoading && !isError ? (
-              <InstructorScheduleCards
-                groups={instructorGroups}
-                remarksDrafts={remarksDrafts}
-                instructorRemarksDrafts={instructorRemarksDrafts}
-                onDraftChange={updateDraft}
-                onInstructorDraftChange={updateInstructorDraft}
-                onSave={saveRemarks}
-                onSaveInstructorRemarks={saveInstructorRemarks}
-                savingDraftKey={remarksMutation.variables?.draftKey}
-                canSave={canSaveRemarks}
-              />
+              <>
+                <DailyEnrollmentCards entries={dailyEnrollmentEntries} />
+                <InstructorScheduleCards
+                  groups={instructorGroups}
+                  remarksDrafts={remarksDrafts}
+                  instructorRemarksDrafts={instructorRemarksDrafts}
+                  onDraftChange={updateDraft}
+                  onInstructorDraftChange={updateInstructorDraft}
+                  onSave={saveRemarks}
+                  onSaveInstructorRemarks={saveInstructorRemarks}
+                  savingDraftKey={remarksMutation.variables?.draftKey}
+                  canSave={canSaveRemarks}
+                />
+              </>
             ) : null}
           </main>
         </div>

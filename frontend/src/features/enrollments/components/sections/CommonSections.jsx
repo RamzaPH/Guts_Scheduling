@@ -36,16 +36,6 @@ const clientTypeOptions = [
   { value: "Carmona Estates Booking Office", label: "Carmona Estates Booking Office" },
 ];
 
-const educationalAttainmentOptions = [
-  { value: "College", label: "College" },
-  { value: "High School", label: "High School" },
-  { value: "Elementary", label: "Elementary" },
-  { value: "Post Graduate", label: "Post Graduate" },
-  { value: "Vocational", label: "Vocational" },
-  { value: "Informal Schooling", label: "Informal Schooling" },
-  { value: "Other", label: "Other" },
-];
-
 const enrollingForOptions = [
   {
     value: "Theoretical Driving Course (TDC 15 hrs Lecture/Seminar) - FOR STUDENT PERMIT APPLICATION",
@@ -184,11 +174,11 @@ export function PersonalInfoSection({ type, form, onFieldChange, promoOfferOptio
               tabIndex={-1}
             />
             <FormField
-              label="GMAIL/YMAIL ACCOUNT"
+              label="EMAIL (Gmail, Yahoo Mail, etc.)"
               name="gmail_account"
               value={form.profile.gmail_account}
               onChange={(event) => onFieldChange("profile", "gmail_account", event.target.value)}
-              placeholder="Gmail/Ymail Account"
+              placeholder="Email address"
               required
             />
           </div>
@@ -330,23 +320,23 @@ export function PersonalInfoSection({ type, form, onFieldChange, promoOfferOptio
               required
             />
             <FormField
-              label="ACTIVE GMAIL/YMAIL ACCOUNT"
+              label="EMAIL (Gmail, Yahoo Mail, etc.)"
               name="gmail_account"
               value={form.profile.gmail_account}
               onChange={(event) => onFieldChange("profile", "gmail_account", event.target.value)}
-              placeholder="Gmail/Ymail Account"
+              placeholder="Email address"
               required
             />
           </div>
 
-          <SectionTitle>EMERGENCY & CREDENTIALS</SectionTitle>
+          <SectionTitle>EMERGENCY CONTACTS</SectionTitle>
           <div className="grid gap-3 md:grid-cols-1">
             <FormField
-              label="LTO/LTMS Portal Account ( LTO Client Id No. )"
+              label="LTO/LTMS CLIENT ID"
               name="lto_portal_account"
               value={form.extras.lto_portal_account}
               onChange={(event) => onFieldChange("extras", "lto_portal_account", event.target.value)}
-              placeholder="LTO/LTMS Portal Account"
+              placeholder="LTO/LTMS Client ID"
               required
             />
           </div>
@@ -363,15 +353,6 @@ export function PersonalInfoSection({ type, form, onFieldChange, promoOfferOptio
               onChange={(event) => onFieldChange("profile", "civil_status", event.target.value)}
               placeholder="Select Marital Status"
               options={civilStatusOptions}
-              required
-            />
-            <SelectField
-              label="Educational Attainment"
-              name="educational_attainment"
-              value={form.extras.educational_attainment}
-              onChange={(event) => onFieldChange("extras", "educational_attainment", event.target.value)}
-              placeholder="Select Educational Attainment"
-              options={educationalAttainmentOptions}
               required
             />
           </div>
@@ -406,10 +387,10 @@ export function PersonalInfoSection({ type, form, onFieldChange, promoOfferOptio
             />
           </div>
 
-          <SectionTitle>EMERGENCY & CREDENTIALS</SectionTitle>
+          <SectionTitle>EMERGENCY CONTACTS</SectionTitle>
           <div className="grid gap-3 md:grid-cols-2">
             <FormField
-              label="Emergency Contact Person"
+              label="EMERGENCY CONTACT PERSON"
               name="emergency_contact_person"
               value={form.extras.emergency_contact_person}
               onChange={(event) => onFieldChange("extras", "emergency_contact_person", event.target.value)}
@@ -417,7 +398,7 @@ export function PersonalInfoSection({ type, form, onFieldChange, promoOfferOptio
               required
             />
             <FormField
-              label="Emergency Contact Number"
+              label="EMERGENCY CONTACT NUMBER"
               name="emergency_contact_number"
               value={form.extras.emergency_contact_number}
               onChange={(event) => onFieldChange("extras", "emergency_contact_number", event.target.value)}
@@ -427,11 +408,11 @@ export function PersonalInfoSection({ type, form, onFieldChange, promoOfferOptio
           </div>
           <div className="mt-2 grid gap-3 md:grid-cols-1">
             <FormField
-              label="LTO/LTMS Portal Account ( LTO Client Id No. )"
+              label="LTO/LTMS CLIENT ID"
               name="lto_portal_account"
               value={form.extras.lto_portal_account}
               onChange={(event) => onFieldChange("extras", "lto_portal_account", event.target.value)}
-              placeholder="LTO/LTMS Portal Account"
+              placeholder="LTO/LTMS Client ID"
               required
             />
           </div>
@@ -499,7 +480,6 @@ export function AddressSection({ type, form, onFieldChange }) {
         <FormField
           label="STREET / PHASE / SUBDIVISION"
           name="street"
-          value={form.profile.street}
           onChange={(event) => onFieldChange("profile", "street", event.target.value)}
           placeholder="Street / Phase / Subdivision"
           required={type === "PDC" || type === "TDC" || type === "PROMO"}

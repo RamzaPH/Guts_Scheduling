@@ -140,14 +140,14 @@ function toCurrencyNumber(value) {
 }
 
 function resolvePromoPrice(offer) {
-  const discounted = normalizeAmount(offer?.discounted_price);
-  if (discounted !== null && discounted > 0) {
-    return discounted;
-  }
-
   const fixed = normalizeAmount(offer?.fixed_price);
   if (fixed !== null && fixed > 0) {
     return fixed;
+  }
+
+  const discounted = normalizeAmount(offer?.discounted_price);
+  if (discounted !== null && discounted > 0) {
+    return discounted;
   }
 
   return 0;
@@ -325,6 +325,8 @@ function normalizeEnrollmentPayload(enrollment = {}, extras = {}, studentId, dlC
     enrollment_channel: channel,
     external_application_ref: normalizeText(enrollment.external_application_ref),
     pdc_start_mode: startMode,
+    pdc_desired_date: normalizeText(enrollment.pdc_desired_date),
+    pdc_desired_time_slot: normalizeText(enrollment.pdc_desired_time_slot),
     // allow multiple additional promo offer ids (from public enroll modal)
     additional_promo_offer_ids: Array.isArray(enrollment.additional_promo_offer_ids)
       ? enrollment.additional_promo_offer_ids.map((v) => (v === null || v === undefined ? null : Number(v)))
@@ -457,6 +459,10 @@ function normalizeSchedulePayload(schedule = {}, payload = {}, enrollment = null
     vehicle_id: vehicleId,
     schedule_date: scheduleDate,
     slot,
+    target_vehicle: normalizeText(payload?.enrollment?.target_vehicle),
+    transmission_type: normalizeText(payload?.enrollment?.transmission_type),
+    motorcycle_type: normalizeText(payload?.enrollment?.motorcycle_type),
+    is_already_driver: Boolean(payload?.enrollment?.is_already_driver),
     remarks: null,
   };
 }
@@ -668,6 +674,13 @@ async function addEnrollment(payload) {
 
       // Attach computed additional promos amount into enrollment payload so it's persisted
       const normalizedEnrollment = normalizeEnrollmentPayload(payload.enrollment, payload.extras, student.id, dlCode.id, payload.qrCodeId ?? payload.qr_code_id ?? null);
+      if (payload.enrollment_type === "TDC" && payload.schedule?.schedule_date) {
+        normalizedEnrollment.tdc_completion_deadline = normalizeText(payload.schedule.schedule_date);
+      }
+      if (payload.enrollment_type === "PDC" && payload.schedule?.schedule_date) {
+        normalizedEnrollment.pdc_desired_date = normalizeText(payload.schedule.schedule_date);
+        normalizedEnrollment.pdc_desired_time_slot = normalizeText(payload.schedule.slot);
+      }
       normalizedEnrollment.additional_promo_offer_ids = additionalPromoComputation.normalizedIds;
       if (!normalizedEnrollment.fee_amount) normalizedEnrollment.fee_amount = 0;
       normalizedEnrollment.additional_promos_amount = additionalPromoComputation.additionalPromosAmount;

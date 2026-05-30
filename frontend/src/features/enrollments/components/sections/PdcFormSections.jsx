@@ -104,6 +104,7 @@ export default function PdcFormSections({ form, onFieldChange }) {
           value={form.extras.emergency_contact_person}
           onChange={(event) => onFieldChange("extras", "emergency_contact_person", event.target.value)}
           placeholder="Emergency Contact Person"
+          required
         />
         <FormField
           label="EMERGENCY CONTACT NUMBER"
@@ -111,15 +112,17 @@ export default function PdcFormSections({ form, onFieldChange }) {
           value={form.extras.emergency_contact_number}
           onChange={(event) => onFieldChange("extras", "emergency_contact_number", event.target.value)}
           placeholder="Emergency Contact Number"
+          required
         />
       </div>
       <div className="mt-2 grid gap-3 md:grid-cols-1">
         <FormField
-          label="LTO/LTMS PORTAL ACCOUNT"
+          label="LTO/LTMS CLIENT ID"
           name="lto_portal_account"
           value={form.extras.lto_portal_account}
           onChange={(event) => onFieldChange("extras", "lto_portal_account", event.target.value)}
-          placeholder="LTO/LTMS Portal Account"
+          placeholder="LTO/LTMS Client ID"
+          required
         />
       </div>
 
@@ -186,11 +189,11 @@ export default function PdcFormSections({ form, onFieldChange }) {
         <>
           <div className="mt-2 grid gap-3 md:grid-cols-2">
             <SelectField
-              label="MARUNONG KA NA BANG MAGMANEHO?"
+                label="MARUNONG KA NA BANG MAGMANEHO, MANEUVERING/PARKING?"
               name="is_already_driver"
               value={String(form.enrollment.is_already_driver)}
               onChange={(event) => onFieldChange("enrollment", "is_already_driver", event.target.value)}
-              placeholder="Select Marunong ka na bang magmaneho?"
+                placeholder="Select Yes or No"
               options={yesNoOptions}
               inputClassName="text-slate-900"
               required

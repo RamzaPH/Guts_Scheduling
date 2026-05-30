@@ -25,7 +25,7 @@ function getStatusTone(statusLabel) {
   const normalizedStatusLabel = String(statusLabel || "").toUpperCase();
   if (normalizedStatusLabel.includes("CANCELLED")) return "slate";
   if (normalizedStatusLabel.includes("FAILED")) return "red";
-  if (normalizedStatusLabel.includes("PASSED")) return "green";
+  if (normalizedStatusLabel.includes("PASSED") || normalizedStatusLabel.includes("COMPLETED")) return "green";
   if (
     normalizedStatusLabel.includes("RETAKE") ||
     normalizedStatusLabel.includes("ABSENT") ||

@@ -91,6 +91,8 @@ const enrollmentCreateSchema = Joi.object({
     pdc_start_mode: Joi.string().valid("now", "later").allow("", null),
     pdc_type: Joi.string().valid("beginner", "experience").allow(null, ""),
     pdc_category: Joi.string().valid("Beginner", "Experience", "beginner", "experience").allow(null, ""),
+    pdc_desired_date: Joi.date().iso().allow(null, ""),
+    pdc_desired_time_slot: Joi.string().valid("morning", "afternoon").allow(null, ""),
     enrolling_for: optionalText,
     score: optionalText,
     status: Joi.string().valid("pending", "confirmed", "completed").default("pending"),
@@ -120,6 +122,8 @@ const enrollmentCreateSchema = Joi.object({
   const scheduleEnabled = Boolean(value.schedule?.enabled);
   const feeAmount = value.enrollment?.fee_amount;
   const discountAmount = value.enrollment?.discount_amount;
+  const emergencyContactPerson = normalize(value.extras?.emergency_contact_person);
+  const emergencyContactNumber = normalize(value.extras?.emergency_contact_number);
 
   if (value.enrollment_type === "PDC" && !hasPdcSelection) {
     return helpers.error("any.custom", {
@@ -173,6 +177,18 @@ const enrollmentCreateSchema = Joi.object({
   if (value.enrollment_type === "PROMO" && !hasPdcSelection) {
     return helpers.error("any.custom", {
       message: "pdc_category is required for PROMO enrollments",
+    });
+  }
+
+  if (!emergencyContactPerson) {
+    return helpers.error("any.custom", {
+      message: "emergency_contact_person is required",
+    });
+  }
+
+  if (!emergencyContactNumber) {
+    return helpers.error("any.custom", {
+      message: "emergency_contact_number is required",
     });
   }
 
@@ -267,6 +283,8 @@ const enrollmentUpdateSchema = Joi.object({
   training_method: optionalText,
   pdc_type: Joi.string().valid("beginner", "experience").allow(null, ""),
   pdc_category: Joi.string().valid("Beginner", "Experience").allow(null, ""),
+  pdc_desired_date: Joi.date().iso().allow(null, ""),
+  pdc_desired_time_slot: Joi.string().valid("morning", "afternoon").allow(null, ""),
   enrolling_for: optionalText,
   score: optionalText,
   status: Joi.string().valid("pending", "confirmed", "completed", "rejected"),

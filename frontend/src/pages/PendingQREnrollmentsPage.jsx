@@ -9,6 +9,20 @@ function moneyLabel(value) {
   return `PHP ${numeric.toFixed(2)}`;
 }
 
+function getPendingDesiredDate(enrollment) {
+  const enrollmentType = String(enrollment?.enrollment_type || enrollment?.Enrollment?.enrollment_type || enrollment?.qrCode?.template?.enrollment_type || enrollment?.qrCode?.name || "").trim().toUpperCase();
+
+  if (enrollmentType === "PDC") {
+    return enrollment?.pdc_desired_date || enrollment?.promo_schedule_pdc?.schedule_date || "";
+  }
+
+  if (enrollmentType === "TDC") {
+    return enrollment?.tdc_completion_deadline || enrollment?.promo_schedule_tdc?.schedule_date || "";
+  }
+
+  return enrollment?.pdc_desired_date || enrollment?.tdc_completion_deadline || "";
+}
+
 export default function PendingQREnrollmentsPage() {
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -164,6 +178,11 @@ export default function PendingQREnrollmentsPage() {
                       <td className="px-5 py-4">
                         <div className="font-semibold text-slate-900">{enrollment.qrCode?.name || "-"}</div>
                         <div className="text-xs text-slate-500">{enrollment.qrCode?.token || "-"}</div>
+                        {getPendingDesiredDate(enrollment) ? (
+                          <div className="mt-1 text-xs font-medium text-[#800000]">
+                            Desired Date: {getPendingDesiredDate(enrollment)}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-5 py-4 text-slate-700">{moneyLabel(enrollment.payment_summary?.total_due || enrollment.fee_amount)}</td>
                       <td className="px-5 py-4 text-slate-700">
