@@ -27,6 +27,7 @@ Production env checklist:
 
 - `docs/production-env-checklist.md`
 - `.env.production.template`
+- `infra/cloudflared/README.md` (public QR tunnel setup and credential placement)
 
 After first successful startup on a fresh database:
 
@@ -35,6 +36,8 @@ After first successful startup on a fresh database:
 3. Re-run deploy command above
 
 Detailed guide: `backend/docs/docker-tailscale-deploy.md`
+
+Public QR tunnel setup: `docs/public-qr-cloudflared-rollout.md`
 
 Post-deploy verification:
 

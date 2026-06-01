@@ -3,8 +3,25 @@ import { Copy, ExternalLink, Loader2, QrCode, RotateCcw, ShieldCheck, Trash2 } f
 import { api } from "../services/api";
 import { buildQrEnrollmentTemplate, QR_ENROLLMENT_TEMPLATE } from "../shared/qrEnrollmentTemplate";
 
+function resolvePublicQrBaseUrl() {
+  const configuredBaseUrl = import.meta.env.VITE_PUBLIC_QR_BASE_URL;
+
+  if (configuredBaseUrl && typeof configuredBaseUrl === "string") {
+    return configuredBaseUrl.replace(/\/+$/, "");
+  }
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  return "";
+}
+
+const PUBLIC_QR_BASE_URL = resolvePublicQrBaseUrl();
+
 function publicUrl(token) {
-  return `${window.location.origin}/enroll?token=${encodeURIComponent(token)}`;
+  const baseUrl = PUBLIC_QR_BASE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+  return `${baseUrl}/enroll?token=${encodeURIComponent(token)}`;
 }
 
 function defaultTemplateSummary(template) {

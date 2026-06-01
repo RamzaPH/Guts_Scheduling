@@ -8,6 +8,10 @@ Run the app for internal company use only:
 2. Access is only via Tailscale.
 3. No public internet exposure.
 
+If you also need a public QR enrollment entrypoint, use a separate public hostname for the form only and keep the admin dashboard private.
+
+See [docs/public-qr-cloudflared-rollout.md](../docs/public-qr-cloudflared-rollout.md) for the exact Cloudflare Tunnel commands and ingress rules.
+
 ## 1) Server Prerequisites
 
 Install on the server:
@@ -35,7 +39,9 @@ From repository root:
 
 Example:
 
-- `CORS_ALLOWED_ORIGINS=http://guts-server.tailnet-name.ts.net:8080`
+- `CORS_ALLOWED_ORIGINS=https://guts-driving.site,https://guts-admin.tailnet-name.ts.net`
+
+For the public QR flow, also set `VITE_PUBLIC_QR_BASE_URL=https://guts-driving.site` in the frontend build environment so generated QR links always point to the public domain.
 
 ## 4) Start Containers
 

@@ -1,0 +1,12 @@
+name: guts
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+    command: tunnel --config /etc/cloudflared/config.yml run guts-driving-qr
+    volumes:
+      - ./infra/cloudflared:/etc/cloudflared:ro

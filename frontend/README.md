@@ -33,6 +33,7 @@ This auto-creates `frontend/.env` from `frontend/.env.example`.
 - `VITE_API_BASE_URL` (default `/api`)
 - `VITE_API_PROXY_TARGET` (local default `http://localhost:5000`, Docker `http://backend:5000`)
 - `VITE_HMR_CLIENT_PORT` (optional; used in Docker port mapping scenarios)
+- `VITE_PUBLIC_QR_BASE_URL` (public enrollment domain used when generating QR links, for example `https://guts-driving.site`)
 
 ## Frontend Highlights
 

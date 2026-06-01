@@ -1,0 +1,20 @@
+tunnel: guts-driving-qr
+credentials-file: /etc/cloudflared/guts-driving-qr.json
+
+ingress:
+  - hostname: guts-driving.site
+    path: /enroll*
+    service: http://frontend:80
+  - hostname: guts-driving.site
+    path: /assets/*
+    service: http://frontend:80
+  - hostname: guts-driving.site
+    path: /api/enroll*
+    service: http://frontend:80
+  - hostname: guts-driving.site
+    path: /favicon.ico
+    service: http://frontend:80
+  - hostname: guts-driving.site
+    path: /manifest.json
+    service: http://frontend:80
+  - service: http_status:404
