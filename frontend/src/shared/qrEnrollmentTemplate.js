@@ -7,16 +7,24 @@ const clientTypeOptions = [
 const genderOptions = ["Male", "Female", "Prefer not to say"];
 const civilStatusOptions = ["Single", "Married", "Separated", "Widowed"];
 const nationalityOptions = ["Filipino", "Foreign", "Others"];
+
 const enrollingForOptions = [
   "Theoretical Driving Course (TDC 15 hrs Lecture/Seminar) - FOR STUDENT PERMIT APPLICATION",
   "DEFENSIVE DRIVING SEMINAR (WITH NON PRO/ PRO LICENSE)",
 ];
-const pdcClassificationOptions = ["Beginner", "Experience"];
-const yesNoOptions = ["Yes", "No"];
+
+const yesNoOptions = [
+  { value: "true", label: "Yes" },
+  { value: "false", label: "No" },
+];
+
+// Inalis na natin ang tdcSourceOptions dito dahil hindi na natin gagamitin sa baba
+
 const pdcTimeSlotOptions = [
   { value: "morning", label: "Morning (AM)" },
   { value: "afternoon", label: "Afternoon (PM)" },
 ];
+
 const pdcVehicleTypeOptions = [
   "DL Codes A - Motorcycle (2 wheels)",
   "DL Codes A1 - Tricycle (3 wheels)",
@@ -24,15 +32,30 @@ const pdcVehicleTypeOptions = [
   "DL Codes B1 - L300/Van (4 wheels - 9 seaters above)",
   "Other",
 ];
+
 const promoPdcEnrollingForOptions = [
-  "PDC Experienced",
-  "PDC Beginner",
-  "PDC Additional Restriction / DL Codes - Experienced",
-  "PDC Additional Restriction / DL Codes- Beginner",
-  "DRIVING LESSON ( w/ license already)",
-  "Other",
+  {
+    value: "Experienced (w/ experience in driving/Applicable para sa marunong na talaga magdrive)",
+    label: "Experienced (w/ experience in driving/Applicable para sa marunong na talaga magdrive)",
+  },
+  {
+    value: "BEGINNER ( w/out Experience in Driving / Driving Enhancement/ Magpapaturo pa magdrive)",
+    label: "BEGINNER ( w/out Experience in Driving / Driving Enhancement/ Magpapaturo pa magdrive)",
+  },
+  {
+    value: "ADD RC/DL Codes -EXPERIENCED ( Para sa mga magpapadagdag ng DL Codes na marunong na talaga magdrive)",
+    label: "ADD RC/DL Codes -EXPERIENCED ( Para sa mga magpapadagdag ng DL Codes na marunong na talaga magdrive)",
+  },
+  {
+    value: "ADD RC/DL Codes -BEGINNER ( Para sa mga magpapadagdag ng DL Codes na Magpapaturo pa mag drive)",
+    label: "ADD RC/DL Codes -BEGINNER ( Para sa mga magpapadagdag ng DL Codes na Magpapaturo pa mag drive)",
+  },
+  {
+    value: "DRIVING LESSON ( Para sa mga may lisensya na at may DLCodes na B/B1 na Magpapaturo pa magdrive)",
+    label: "DRIVING LESSON ( Para sa mga may lisensya na at may DLCodes na B/B1 na Magpapaturo pa magdrive)",
+  },
+  { value: "Other", label: "Other" },
 ];
-// Removed unused option lists to satisfy linting (previously defined but not used)
 
 function section(title, description, fields = []) {
   return { title, description, fields };
@@ -50,7 +73,6 @@ function dateField(name, label, required = false, extra = {}) {
   return { name, label, type: "date", required, ...extra };
 }
 
-// Standardized sections used by all enrollment forms
 const commonClientInfoSection = [
   selectField("enrollment.promo_offer_id", "PROMO OFFER", [], false),
   selectField("enrollment.client_type", "CLIENT TYPE", clientTypeOptions, true),
@@ -115,9 +137,16 @@ const templatesByType = {
       section("EMERGENCY & CREDENTIALS", "Student contact and account details used during review.", commonEmergencySection),
       section("COURSE INFORMATION", "Pick the PDC track and related training details.", [
         selectField("extras.enrolling_for", "ENROLLING FOR", promoPdcEnrollingForOptions, true),
-        selectField("enrollment.pdc_category", "PDC CLASSIFICATION", pdcClassificationOptions, true),
+        // Tinanggal ang TDC SOURCE dito para hindi na maging redundant
         selectField("enrollment.is_already_driver", "MARUNONG KA NA BANG MAGMANEHO, MANEUVERING/PARKING?", yesNoOptions, false),
         selectField("enrollment.target_vehicle", "ANONG SASAKYAN ANG IMAMANEHO?", pdcVehicleTypeOptions, false),
+        selectField("enrollment.transmission_type", "ANONG KLASE NG TRANSMISSION?", [
+          "AUTOMATIC TRANSMISSION (A/T) not allowed to drive M/T",
+          "MANUAL TRANSMISSION (M/T) allowed to drive A/T",
+          "Other",
+        ], false),
+        selectField("extras.driving_school_tdc", "Driving School where you have taken your TDC", ["GUTS Driving School", "Other"], true),
+        textField("extras.year_completed_tdc", "Year you completed your TDC", true),
       ]),
       section("PDC Schedule Session", "Enter the desired first date and time slot for the PDC intake. The next day will follow the same slot for consecutive-day scheduling.", [
         dateField("schedule.schedule_date", "Desired Date", true),
@@ -141,7 +170,6 @@ const templatesByType = {
         dateField("promo_schedule_tdc.schedule_date", "Desired Date", true),
         { type: "note", content: "Encoder/staff will assign the instructor, time slot, and final schedule details after review." }
       ]),
-      // PDC scheduling at creation is disabled: always schedule later. Encoder/staff will assign PDC schedule after review.
       section("PDC Details", "PDC is automatically set to Schedule Later.", [
         { type: "note", content: "PDC is automatically set to Schedule Later. PDC course information stays here, and the schedule will be assigned after review." },
       ]),
@@ -178,7 +206,6 @@ export const QR_ENROLLMENT_TEMPLATE = {
     section("Enrollment Type", "Tell us what kind of enrollment you want to submit.", [
       selectField("enrollment_type", "Enrollment Type", ["TDC", "PDC", "PROMO"], true),
       selectField("enrollment.client_type", "Client Type", clientTypeOptions.map((option) => option.value), true),
-      selectField("enrollment.pdc_category", "PDC Category", ["Beginner", "Experience"], false),
     ]),
   ],
 };

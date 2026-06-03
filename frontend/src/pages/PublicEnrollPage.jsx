@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { QR_ENROLLMENT_TEMPLATE, buildQrEnrollmentTemplate, resolveQrEnrollmentType } from "../shared/qrEnrollmentTemplate";
+import { getPdcCategoryFromEnrollment, inferPdcCategory } from "../features/enrollments/utils/pdcClassification";
 import {
   getBarangayOptions,
   getCityOptions,
@@ -185,6 +186,10 @@ function FieldControl({ field, value, onChange, formData }) {
   );
 }
 
+function isPdcDriverField(fieldName) {
+  return fieldName === "enrollment.target_vehicle" || fieldName === "enrollment.transmission_type";
+}
+
 function clearDependentAddressFields(name, current) {
   let next = current;
 
@@ -253,7 +258,6 @@ function normalizeTemplate(template) {
     return QR_ENROLLMENT_TEMPLATE;
   }
 
-  // If template already has sections, use it as-is (preserve server-provided structure)
   if (Array.isArray(template.sections) && template.sections.length > 0) {
     return {
       ...QR_ENROLLMENT_TEMPLATE,
@@ -262,7 +266,6 @@ function normalizeTemplate(template) {
     };
   }
 
-  // Try to infer type and rebuild if needed
   const enrollmentType = resolveQrEnrollmentType(template);
   if (enrollmentType) {
     return buildQrEnrollmentTemplate(enrollmentType);
@@ -316,7 +319,7 @@ export default function PublicEnrollPage() {
   const [submitState, setSubmitState] = useState("idle");
   const [promoOptions, setPromoOptions] = useState([]);
   const [showPromoPrompt, setShowPromoPrompt] = useState(false);
-  const [wantsPromo, setWantsPromo] = useState(null); // null = unanswered, true/false
+  const [wantsPromo, setWantsPromo] = useState(null); 
   const [selectedPromos, setSelectedPromos] = useState([]);
   const [promoConfirmed, setPromoConfirmed] = useState(false);
 
@@ -330,8 +333,8 @@ export default function PublicEnrollPage() {
     setPromoConfirmed(false);
     try {
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch {
-      // no-op for environments that do not support smooth scroll
+    } catch (error) {
+      void error;
     }
   }
 
@@ -374,7 +377,6 @@ export default function PublicEnrollPage() {
           loadedPromoOptions = [];
         }
 
-        // Fetch schedule options (instructors and vehicles)
         let scheduleOptions = { instructors: [], vehicles: [] };
         try {
           const scheduleResponse = await fetch(`/api/enroll/schedule-options?token=${encodeURIComponent(token)}`);
@@ -386,7 +388,6 @@ export default function PublicEnrollPage() {
           scheduleOptions = { instructors: [], vehicles: [] };
         }
 
-        // Enrich template with schedule options
         let enrichedTemplate = normalizeTemplate(data.template);
         if (enrichedTemplate.sections && Array.isArray(enrichedTemplate.sections)) {
           enrichedTemplate.sections = enrichedTemplate.sections.map((section) => {
@@ -436,11 +437,30 @@ export default function PublicEnrollPage() {
       let next = createNestedValue(current, name, normalizedValue);
       next = clearDependentAddressFields(name, next);
 
+      if (name === "extras.enrolling_for" || name === "enrollment.training_method") {
+        const inferredCategory = inferPdcCategory(
+          name === "extras.enrolling_for" ? normalizedValue : next?.extras?.enrolling_for,
+          name === "enrollment.training_method" ? normalizedValue : next?.enrollment?.training_method,
+        );
+
+        next = createNestedValue(next, "enrollment.pdc_category", inferredCategory);
+
+        if (inferredCategory !== "Experience") {
+          next = createNestedValue(next, "enrollment.is_already_driver", false);
+          next = createNestedValue(next, "enrollment.target_vehicle", "");
+          next = createNestedValue(next, "enrollment.transmission_type", "");
+        }
+      }
+
+      if (name === "enrollment.is_already_driver" && !normalizeBooleanValue(normalizedValue)) {
+        next = createNestedValue(next, "enrollment.target_vehicle", "");
+        next = createNestedValue(next, "enrollment.transmission_type", "");
+      }
+
       if (name === "extras.region" || name === "profile.province" || name === "profile.city" || name === "profile.barangay") {
         next = createNestedValue(next, "profile.zip_code", getAutoZipCode(next));
       }
 
-      // Auto-calculate age from birthdate
       if (name === "profile.birthdate" && normalizedValue) {
         const birthDate = new Date(normalizedValue);
         const today = new Date();
@@ -459,14 +479,12 @@ export default function PublicEnrollPage() {
   async function handleSubmit(event) {
     event.preventDefault();
 
-    // If we have promo offers and the user hasn't been prompted yet,
-    // show the promo prompt modal instead of immediately submitting.
     if (Array.isArray(promoOptions) && promoOptions.length > 0 && !promoConfirmed) {
       setShowPromoPrompt(true);
       return;
     }
     const payload = buildPayload();
-    if (!payload) return; // buildPayload sets status when invalid
+    if (!payload) return; 
     await submitPayload(payload);
   }
 
@@ -486,7 +504,13 @@ export default function PublicEnrollPage() {
         promo_offer_id: formData.enrollment?.promo_offer_id ? Number(formData.enrollment.promo_offer_id) : null,
         additional_promo_offer_ids: Array.isArray(selectedPromos) && selectedPromos.length > 0 ? [Number(selectedPromos[0])] : undefined,
         is_already_driver: normalizeBooleanValue(formData.enrollment?.is_already_driver),
+        pdc_category: getPdcCategoryFromEnrollment(formData.enrollment?.pdc_category, formData.extras?.enrolling_for, formData.enrollment?.training_method) || null,
+        pdc_type: getPdcCategoryFromEnrollment(formData.enrollment?.pdc_category, formData.extras?.enrolling_for, formData.enrollment?.training_method)
+          ? getPdcCategoryFromEnrollment(formData.enrollment?.pdc_category, formData.extras?.enrolling_for, formData.enrollment?.training_method).toLowerCase()
+          : null,
         enrollment_channel: "qr_public",
+        target_vehicle: normalizeBooleanValue(formData.enrollment?.is_already_driver) ? formData.enrollment?.target_vehicle || null : null,
+        transmission_type: normalizeBooleanValue(formData.enrollment?.is_already_driver) ? formData.enrollment?.transmission_type || null : null,
       },
       schedule:
         (template?.enrollment_type || formData.enrollment_type) === "PDC" || (template?.enrollment_type || formData.enrollment_type) === "TDC"
@@ -569,6 +593,11 @@ export default function PublicEnrollPage() {
     const sourceSections = template?.sections || [];
     const processedSections = [];
     const effectiveEnrollmentType = resolveQrEnrollmentType(template);
+    
+    // TAMA NA ANG LOGIC DITO: Hinahanap natin diretso yung salitang "Experience" tulad sa Main Form
+    const selectedEnrollingFor = formData.extras?.enrolling_for || "";
+    const isExperiencePdc = selectedEnrollingFor.toLowerCase().includes("experience");
+    const isDriver = normalizeBooleanValue(formData.enrollment?.is_already_driver);
 
     for (const section of sourceSections) {
       if (effectiveEnrollmentType === "TDC" && (section.title === "DRIVING INFORMATION" || section.title === "Schedule Session")) {
@@ -587,6 +616,20 @@ export default function PublicEnrollPage() {
           };
         }
         return field;
+      }).filter((field) => {
+        if (effectiveEnrollmentType !== "PDC") {
+          return true;
+        }
+
+        if (field?.name === "enrollment.is_already_driver") {
+          return isExperiencePdc;
+        }
+
+        if (isPdcDriverField(field?.name)) {
+          return isExperiencePdc && isDriver;
+        }
+
+        return true;
       });
 
       processedSections.push({
@@ -596,7 +639,7 @@ export default function PublicEnrollPage() {
     }
 
     return processedSections;
-  }, [template, promoOptions]);
+  }, [template, promoOptions, formData]); // Idinagdag ang formData sa dependencies para mag-update agad ang UI
 
   const promoModalRef = useRef(null);
 
@@ -605,7 +648,7 @@ export default function PublicEnrollPage() {
       try {
         window.scrollTo({ top: 0, behavior: "auto" });
       } catch (e) {
-        void e; // ignore scroll errors in some browsers
+        void e; 
       }
       setTimeout(() => {
         try {
@@ -614,7 +657,7 @@ export default function PublicEnrollPage() {
             promoModalRef.current.focus?.();
           }
         } catch (e) {
-          void e; // ignore focus/scrollIntoView errors
+          void e; 
         }
       }, 60);
     }
@@ -763,7 +806,6 @@ export default function PublicEnrollPage() {
             </div>
           ) : null}
 
-          {/* Promo confirmation modal shown when user hits submit */}
           {showPromoPrompt ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center">
               <div className="absolute inset-0 bg-black/40" onClick={() => { setShowPromoPrompt(false); setWantsPromo(null); }} />
@@ -821,8 +863,6 @@ export default function PublicEnrollPage() {
                     type="button"
                     disabled={wantsPromo && selectedPromos.length === 0}
                     onClick={async () => {
-                      // Confirm choice and proceed to submit directly to avoid
-                      // racing state updates that required a second click.
                       setPromoConfirmed(true);
                       setShowPromoPrompt(false);
                       setStatus("");

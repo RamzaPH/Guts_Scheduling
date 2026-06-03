@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const { sequelize } = require("../../../models");
 const repository = require("./enrollments.repository");
 const schedulesService = require("../schedules/schedules.service");
@@ -218,7 +219,25 @@ function attachPaymentSummary(enrollment) {
   };
 }
 
-function normalizePdcType(rawType, rawCategory) {
+function inferPdcTypeFromEnrollingFor(enrollingFor) {
+  const normalized = normalizeText(enrollingFor)?.toLowerCase() || "";
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized.includes("beginner")) {
+    return "beginner";
+  }
+
+  if (normalized.includes("experience") || normalized.includes("experienced") || normalized.includes("driving lesson")) {
+    return "experience";
+  }
+
+  return null;
+}
+
+function normalizePdcType(rawType, rawCategory, enrollingFor = null) {
   const normalizedType = normalizeText(rawType);
   if (normalizedType) {
     return normalizedType.toLowerCase();
@@ -226,10 +245,32 @@ function normalizePdcType(rawType, rawCategory) {
 
   const normalizedCategory = normalizeText(rawCategory);
   if (!normalizedCategory) {
-    return null;
+    return inferPdcTypeFromEnrollingFor(enrollingFor);
   }
 
-  return normalizedCategory.toLowerCase() === "experience" ? "experience" : "beginner";
+  if (normalizedCategory.toLowerCase() === "experience") {
+    return "experience";
+  }
+
+  if (normalizedCategory.toLowerCase() === "beginner") {
+    return "beginner";
+  }
+
+  return inferPdcTypeFromEnrollingFor(enrollingFor);
+}
+
+function normalizePdcCategoryLabel(rawType, rawCategory, enrollingFor = null) {
+  const inferredType = normalizePdcType(rawType, rawCategory, enrollingFor);
+
+  if (inferredType === "experience") {
+    return "Experience";
+  }
+
+  if (inferredType === "beginner") {
+    return "Beginner";
+  }
+
+  return null;
 }
 
 function enrollmentTypeFromDlCodeCode(dlCodeRaw) {
@@ -251,6 +292,8 @@ function normalizeStudentPayload(student = {}) {
 }
 
 function normalizeProfilePayload(studentId, profile = {}, extras = {}, enrollment = {}) {
+  const isDriver = Boolean(enrollment.is_already_driver);
+
   return {
     student_id: studentId,
     // Personal Information
@@ -284,21 +327,22 @@ function normalizeProfilePayload(studentId, profile = {}, extras = {}, enrollmen
     client_type: normalizeText(profile.client_type || enrollment.client_type || extras.client_type),
     promo_offer_id: profile.promo_offer_id ? Number(profile.promo_offer_id) : (enrollment.promo_offer_id ? Number(enrollment.promo_offer_id) : (extras.promo_offer_id ? Number(extras.promo_offer_id) : null)),
     enrolling_for: normalizeText(profile.enrolling_for || enrollment.enrolling_for || extras.enrolling_for),
-    pdc_category: normalizeText(profile.pdc_category || enrollment.pdc_category || extras.pdc_category),
+    pdc_category: normalizeText(profile.pdc_category || enrollment.pdc_category || extras.pdc_category) || normalizePdcCategoryLabel(enrollment.pdc_type, enrollment.pdc_category, enrollment.enrolling_for || extras.enrolling_for || profile.enrolling_for),
     tdc_source: normalizeText(profile.tdc_source || enrollment.tdc_source || extras.tdc_source),
     training_method: normalizeText(profile.training_method || enrollment.training_method || extras.training_method),
     is_already_driver: Boolean(profile.is_already_driver ?? enrollment.is_already_driver ?? extras.is_already_driver),
-    target_vehicle: normalizeText(profile.target_vehicle || enrollment.target_vehicle || extras.target_vehicle),
-    transmission_type: normalizeText(profile.transmission_type || enrollment.transmission_type || extras.transmission_type),
-    motorcycle_type: normalizeText(profile.motorcycle_type || enrollment.motorcycle_type || extras.motorcycle_type),
+    target_vehicle: isDriver ? normalizeText(profile.target_vehicle || enrollment.target_vehicle || extras.target_vehicle) : null,
+    transmission_type: isDriver ? normalizeText(profile.transmission_type || enrollment.transmission_type || extras.transmission_type) : null,
+    motorcycle_type: isDriver ? normalizeText(profile.motorcycle_type || enrollment.motorcycle_type || extras.motorcycle_type) : null,
   };
 }
 
 function normalizeEnrollmentPayload(enrollment = {}, extras = {}, studentId, dlCodeId, qrCodeId = null) {
-  const normalizedPdcType = normalizePdcType(enrollment.pdc_type, enrollment.pdc_category);
+  const normalizedPdcType = normalizePdcType(enrollment.pdc_type, enrollment.pdc_category, enrollment.enrolling_for || extras.enrolling_for);
   const channel = normalizeText(enrollment.enrollment_channel) || "walk_in";
   const startMode = normalizeText(enrollment.pdc_start_mode) || "later";
   const tdcSource = normalizeText(enrollment.tdc_source);
+  const isDriver = Boolean(enrollment.is_already_driver);
 
   return {
     student_id: studentId,
@@ -308,10 +352,10 @@ function normalizeEnrollmentPayload(enrollment = {}, extras = {}, studentId, dlC
     dl_code_id: dlCodeId,
     qrCodeId,
     client_type: normalizeText(enrollment.client_type),
-    is_already_driver: Boolean(enrollment.is_already_driver),
-    target_vehicle: normalizeText(enrollment.target_vehicle),
-    transmission_type: normalizeText(enrollment.transmission_type),
-    motorcycle_type: normalizeText(enrollment.motorcycle_type),
+    is_already_driver: isDriver,
+    target_vehicle: isDriver ? normalizeText(enrollment.target_vehicle) : null,
+    transmission_type: isDriver ? normalizeText(enrollment.transmission_type) : null,
+    motorcycle_type: isDriver ? normalizeText(enrollment.motorcycle_type) : null,
     training_method: normalizeText(enrollment.training_method),
     pdc_type: normalizedPdcType,
     fee_amount: normalizeAmount(enrollment.fee_amount),
@@ -353,7 +397,7 @@ function toDateOnly(dateInput) {
 
 async function initializePromoLifecycle({ payload, enrollment, student, transaction }) {
   const now = new Date();
-  const pdcType = normalizePdcType(payload.enrollment?.pdc_type, payload.enrollment?.pdc_category) === "experience"
+  const pdcType = normalizePdcType(payload.enrollment?.pdc_type, payload.enrollment?.pdc_category, payload.enrollment?.enrolling_for || payload.extras?.enrolling_for) === "experience"
     ? "experience"
     : "beginner";
 
@@ -432,7 +476,7 @@ function scheduleCourseTypeFromEnrollmentPayload(payload) {
     return "tdc";
   }
 
-  const pdcType = normalizePdcType(payload.enrollment?.pdc_type, payload.enrollment?.pdc_category);
+  const pdcType = normalizePdcType(payload.enrollment?.pdc_type, payload.enrollment?.pdc_category, payload.enrollment?.enrolling_for || payload.extras?.enrolling_for);
   return pdcType === "experience" ? "pdc_experience" : "pdc_beginner";
 }
 
@@ -646,18 +690,19 @@ async function addEnrollment(payload) {
   const transaction = await sequelize.transaction();
 
   try {
-    const hasPdcSelection = Boolean(payload.enrollment?.pdc_category || payload.enrollment?.pdc_type);
+    const pdcType = normalizePdcType(payload.enrollment?.pdc_type, payload.enrollment?.pdc_category, payload.enrollment?.enrolling_for || payload.extras?.enrolling_for);
+    const hasPdcSelection = Boolean(payload.enrollment?.pdc_category || payload.enrollment?.pdc_type || pdcType);
     const isPublicQrEnrollment = payload.enrollment?.enrollment_channel === "qr_public";
 
     if (payload.enrollment_type === "PDC" && !hasPdcSelection) {
-      const error = new Error("pdc_category is required for PDC enrollments");
+      const error = new Error("PDC classification could not be inferred from ENROLLING FOR");
       error.status = 400;
       throw error;
     }
 
     const promoPdcEnabled = Boolean(payload.promo_schedule?.pdc?.enabled);
     if (payload.enrollment_type === "PROMO" && promoPdcEnabled && !hasPdcSelection) {
-      const error = new Error("pdc_category is required for PROMO enrollments");
+      const error = new Error("PDC classification could not be inferred from ENROLLING FOR");
       error.status = 400;
       throw error;
     }
@@ -717,7 +762,7 @@ async function addEnrollment(payload) {
       let promoPdc = null;
       let promoPdcCourseType = null;
       if (shouldSchedulePromoPdc) {
-        promoPdcCourseType = normalizePdcType(payload.enrollment?.pdc_type, payload.enrollment?.pdc_category) === "experience"
+        promoPdcCourseType = normalizePdcType(payload.enrollment?.pdc_type, payload.enrollment?.pdc_category, payload.enrollment?.enrolling_for || payload.extras?.enrolling_for) === "experience"
           ? "pdc_experience"
           : "pdc_beginner";
 
@@ -1067,6 +1112,33 @@ async function editEnrollment(id, payload) {
           vehicle_id: null,
         }, { transaction });
       }
+    }
+
+    const isRejected = String(enrollmentPayload.status || "").toLowerCase() === "rejected";
+    if (isRejected) {
+      const { Schedule } = require("../../../models");
+      const rejectedSchedules = await Schedule.findAll({
+        where: { enrollment_id: id },
+        attributes: ["id"],
+        transaction,
+      });
+
+      if (rejectedSchedules.length > 0) {
+        await Schedule.destroy({
+          where: {
+            id: {
+              [Op.in]: rejectedSchedules.map((item) => item.id),
+            },
+          },
+          transaction,
+        });
+      }
+
+      enrollmentPayload.schedule_id = null;
+      enrollmentPayload.tdc_completion_deadline = null;
+      enrollmentPayload.pdc_eligibility_date = null;
+      enrollmentPayload.pdc_desired_date = null;
+      enrollmentPayload.pdc_desired_time_slot = null;
     }
 
     const hasAdditionalPromoIds = Object.prototype.hasOwnProperty.call(enrollmentPayload, "additional_promo_offer_ids");

@@ -116,8 +116,25 @@ const enrollmentCreateSchema = Joi.object({
     );
   };
 
-  const hasPdcSelection = Boolean(value.enrollment?.pdc_category || value.enrollment?.pdc_type);
-  const pdcCategoryNormalized = normalize(value.enrollment?.pdc_category || value.enrollment?.pdc_type);
+  const inferPdcCategory = (...inputs) => {
+    for (const input of inputs) {
+      const normalized = normalize(input);
+      if (!normalized) continue;
+
+      if (normalized.includes("beginner")) {
+        return "beginner";
+      }
+
+      if (normalized.includes("experience") || normalized.includes("experienced") || normalized.includes("driving lesson")) {
+        return "experience";
+      }
+    }
+
+    return "";
+  };
+
+  const pdcCategoryNormalized = normalize(value.enrollment?.pdc_category || value.enrollment?.pdc_type || inferPdcCategory(value.enrollment?.enrolling_for, value.extras?.enrolling_for));
+  const hasPdcSelection = Boolean(pdcCategoryNormalized);
   const isExperienceCategory = pdcCategoryNormalized === "experience";
   const scheduleEnabled = Boolean(value.schedule?.enabled);
   const feeAmount = value.enrollment?.fee_amount;
@@ -127,7 +144,7 @@ const enrollmentCreateSchema = Joi.object({
 
   if (value.enrollment_type === "PDC" && !hasPdcSelection) {
     return helpers.error("any.custom", {
-      message: "pdc_category is required for PDC enrollments",
+      message: "PDC classification could not be inferred from ENROLLING FOR",
     });
   }
 
@@ -147,18 +164,20 @@ const enrollmentCreateSchema = Joi.object({
     (value.enrollment_type === "PDC" || value.enrollment_type === "PROMO") && isExperienceCategory;
 
   if (requiresExperienceDrivingDetails && value.enrollment?.is_already_driver !== true) {
-    return helpers.error("any.custom", {
-      message: "is_already_driver must be true for Experience enrollments",
-    });
+    if (value.enrollment?.is_already_driver === undefined || value.enrollment?.is_already_driver === null) {
+      return helpers.error("any.custom", {
+        message: "is_already_driver is required for Experience enrollments",
+      });
+    }
   }
 
-  if (requiresExperienceDrivingDetails && !value.enrollment?.target_vehicle) {
+  if (requiresExperienceDrivingDetails && value.enrollment?.is_already_driver === true && !value.enrollment?.target_vehicle) {
     return helpers.error("any.custom", {
       message: "target_vehicle is required for Experience enrollments",
     });
   }
 
-  if (requiresExperienceDrivingDetails && !value.enrollment?.transmission_type) {
+  if (requiresExperienceDrivingDetails && value.enrollment?.is_already_driver === true && !value.enrollment?.transmission_type) {
     return helpers.error("any.custom", {
       message: "transmission_type is required for Experience enrollments",
     });
@@ -176,7 +195,7 @@ const enrollmentCreateSchema = Joi.object({
 
   if (value.enrollment_type === "PROMO" && !hasPdcSelection) {
     return helpers.error("any.custom", {
-      message: "pdc_category is required for PROMO enrollments",
+      message: "PDC classification could not be inferred from ENROLLING FOR",
     });
   }
 

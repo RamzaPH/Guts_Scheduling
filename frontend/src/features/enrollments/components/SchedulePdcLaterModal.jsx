@@ -5,20 +5,6 @@ import { resourceServices } from "../../../services/resources";
 import { createSchedule, fetchDailyReports } from "../../dashboard/services/dashboardApi";
 
 const ENROLLING_FOR_OPTIONS = [
-  { value: "PDC Experienced", label: "PDC Experienced" },
-  { value: "PDC Beginner", label: "PDC Beginner" },
-  { value: "PDC Additional Restriction / DL Codes - Experienced", label: "PDC Additional Restriction / DL Codes - Experienced" },
-  { value: "PDC Additional Restriction / DL Codes- Beginner", label: "PDC Additional Restriction / DL Codes- Beginner" },
-  { value: "DRIVING LESSON ( w/ license already)", label: "DRIVING LESSON ( w/ license already)" },
-  { value: "Other", label: "Other" },
-];
-
-const PDC_CLASSIFICATION_OPTIONS = [
-  { value: "Beginner", label: "Beginner" },
-  { value: "Experience", label: "Experience" },
-];
-
-const TRAINING_MODE_OPTIONS = [
   {
     value: "Experienced (w/ experience in driving/Applicable para sa marunong na talaga magdrive)",
     label: "Experienced (w/ experience in driving/Applicable para sa marunong na talaga magdrive)",
@@ -42,6 +28,16 @@ const TRAINING_MODE_OPTIONS = [
   { value: "Other", label: "Other" },
 ];
 
+const tdcSourceOptions = [
+  { value: "guts", label: "GUTS Driving School" },
+  { value: "external", label: "External Driving School" },
+];
+
+const yesNoOptions = [
+  { value: "true", label: "Yes" },
+  { value: "false", label: "No" },
+];
+
 const TARGET_VEHICLE_OPTIONS = [
   { value: "DL Codes A - Motorcycle (2 wheels)", label: "DL Codes A - Motorcycle (2 wheels)" },
   { value: "DL Codes A1 - Tricycle (3 wheels)", label: "DL Codes A1 - Tricycle (3 wheels)" },
@@ -61,17 +57,27 @@ const DRIVING_SCHOOL_OPTIONS = [
   { value: "Other", label: "Other" },
 ];
 
+// Mapper para mai-convert ang mga lumang records sa bagong format nang hindi nag-e-error
+const LEGACY_ENROLLING_FOR_MAP = {
+  "pdc experienced": "Experienced (w/ experience in driving/Applicable para sa marunong na talaga magdrive)",
+  "pdc beginner": "BEGINNER ( w/out Experience in Driving / Driving Enhancement/ Magpapaturo pa magdrive)",
+  "pdc additional restriction / dl codes - experienced": "ADD RC/DL Codes -EXPERIENCED ( Para sa mga magpapadagdag ng DL Codes na marunong na talaga magdrive)",
+  "pdc additional restriction / dl codes- beginner": "ADD RC/DL Codes -BEGINNER ( Para sa mga magpapadagdag ng DL Codes na Magpapaturo pa mag drive)",
+  "driving lesson ( w/ license already)": "DRIVING LESSON ( Para sa mga may lisensya na at may DLCodes na B/B1 na Magpapaturo pa magdrive)",
+};
+
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-function courseTypeFromClassification(classification) {
-  return classification === "Experience" ? "pdc_experience" : "pdc_beginner";
+function courseTypeFromEnrollment(enrollingFor) {
+  const isExperience = String(enrollingFor || "").toLowerCase().includes("experienced");
+  return isExperience ? "pdc_experience" : "pdc_beginner";
 }
 
-function scheduleCourseLabel(classification) {
-  if (classification === "Experience") return "PDC Experience";
-  if (classification === "Beginner") return "PDC Beginner";
+function scheduleCourseLabel(courseType) {
+  if (courseType === "pdc_experience") return "PDC Experience";
+  if (courseType === "pdc_beginner") return "PDC Beginner";
   return "Select course details above";
 }
 
@@ -87,7 +93,6 @@ function isCarVehicleType(vehicleType) {
 
 function matchesVehicleTarget(vehicleType, targetVehicle) {
   const normalizedTarget = normalizeText(targetVehicle);
-
   if (!normalizedTarget) return true;
 
   const wantsMotorcycle =
@@ -123,13 +128,22 @@ function matchesTransmissionType(vehicleTransmission, selectedTransmission) {
 
 function initialForm(enrollment) {
   const profile = enrollment?.Student?.StudentProfile || {};
-  const pdcType = String(enrollment?.pdc_type || "").toLowerCase();
-  const classification = pdcType === "experience" ? "Experience" : "Beginner";
+  
+  const rawEnrollingFor = enrollment?.enrolling_for || "";
+  const normalizedRaw = rawEnrollingFor.trim().toLowerCase();
+  let mappedEnrollingFor = LEGACY_ENROLLING_FOR_MAP[normalizedRaw] || rawEnrollingFor;
+
+  // FIX: Kung ang nakasave sa database ay para sa TDC (Promo), hindi ito mag-ma-match
+  // sa PDC options list natin. Kaya gagawin nating blank ("") para mapilitan mag-select at walang default.
+  const isValidOption = ENROLLING_FOR_OPTIONS.some(opt => opt.value === mappedEnrollingFor);
+  if (!isValidOption) {
+    mappedEnrollingFor = "";
+  }
 
   return {
-    enrolling_for: enrollment?.enrolling_for || "",
-    pdc_classification: classification,
-    training_method: enrollment?.training_method || "",
+    enrolling_for: mappedEnrollingFor,
+    tdc_source: enrollment?.tdc_source || "guts",
+    is_already_driver: enrollment?.is_already_driver === true ? "true" : enrollment?.is_already_driver === false ? "false" : "",
     target_vehicle: enrollment?.target_vehicle || "",
     transmission_type: enrollment?.transmission_type || "",
     driving_school_tdc: profile?.driving_school_tdc || "",
@@ -173,7 +187,8 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
     staleTime: 5 * 60 * 1000,
   });
 
-  const courseType = courseTypeFromClassification(form.pdc_classification);
+  const courseType = courseTypeFromEnrollment(form.enrolling_for);
+  const isExperienceCategory = courseType === "pdc_experience";
 
   const instructorOptions = useMemo(() => {
     const rows = resources?.instructors || [];
@@ -207,15 +222,7 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
     }));
   }, [resources, form.target_vehicle, form.transmission_type]);
 
-  const selectedVehicle = useMemo(
-    () => (resources?.vehicles || []).find((item) => String(item.id) === String(form.vehicle_id)) || null,
-    [resources, form.vehicle_id]
-  );
-
-  const isWholeDayExperience =
-    courseType === "pdc_experience" && isMotorcycleVehicleType(selectedVehicle?.vehicle_type);
-
-  const activeSlot = isWholeDayExperience ? "morning" : form.slot;
+  const activeSlot = form.slot;
 
   const { data: scheduleAvailability, isLoading: loadingAvailability } = useQuery({
     queryKey: [
@@ -247,14 +254,18 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
     mutationFn: async () => {
       const enrollmentId = Number(enrollment?.id || 0);
       const studentId = Number(enrollment?.Student?.id || enrollment?.student_id || 0);
-      const pdcType = form.pdc_classification === "Experience" ? "experience" : "beginner";
+      const pdcType = courseType === "pdc_experience" ? "experience" : "beginner";
+      const isDriver = form.is_already_driver === "true";
 
       await resourceServices.enrollments.update(enrollmentId, {
         enrolling_for: form.enrolling_for,
+        tdc_source: form.tdc_source,
         pdc_type: pdcType,
-        training_method: form.training_method,
-        target_vehicle: form.target_vehicle,
-        transmission_type: form.transmission_type,
+        pdc_category: pdcType === "experience" ? "Experience" : "Beginner",
+        training_method: form.enrolling_for, 
+        is_already_driver: isDriver,
+        target_vehicle: courseType === "pdc_experience" && isDriver ? form.target_vehicle : null,
+        transmission_type: courseType === "pdc_experience" && isDriver ? form.transmission_type : null,
         pdc_start_mode: "now",
         enrollment_state: "pdc_in_progress",
         status: "confirmed",
@@ -305,14 +316,28 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
     setErrorMessage("");
 
     setForm((current) => {
-      if (name === "pdc_classification") {
+      if (name === "enrolling_for") {
+        const nextCourseType = courseTypeFromEnrollment(value);
+        const nextIsExperience = nextCourseType === "pdc_experience";
         return {
           ...current,
-          pdc_classification: value,
           instructor_id: "",
           care_of_instructor_id: "",
           vehicle_id: "",
           slot: "morning",
+          is_already_driver: nextIsExperience ? current.is_already_driver : "",
+          target_vehicle: nextIsExperience ? current.target_vehicle : "",
+          transmission_type: nextIsExperience ? current.transmission_type : "",
+          [name]: value,
+        };
+      }
+
+      if (name === "is_already_driver") {
+        return {
+          ...current,
+          is_already_driver: value,
+          target_vehicle: value === "true" ? current.target_vehicle : "",
+          transmission_type: value === "true" ? current.transmission_type : "",
         };
       }
 
@@ -340,14 +365,21 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
     event.preventDefault();
     setErrorMessage("");
 
-    if (!form.enrolling_for || !form.pdc_classification || !form.training_method) {
+    if (!form.enrolling_for) {
       setErrorMessage("Complete the PDC course information fields.");
       return;
     }
 
-    if (!form.target_vehicle || !form.transmission_type) {
-      setErrorMessage("Target vehicle and transmission are required.");
-      return;
+    if (courseType === "pdc_experience") {
+      if (form.is_already_driver === "") {
+        setErrorMessage("Please answer whether the student already knows how to drive.");
+        return;
+      }
+
+      if (form.is_already_driver === "true" && (!form.target_vehicle || !form.transmission_type)) {
+        setErrorMessage("Target vehicle and transmission are required for experienced students.");
+        return;
+      }
     }
 
     if (!form.driving_school_tdc || !form.year_completed_tdc) {
@@ -360,7 +392,7 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
       return;
     }
 
-    if (!isWholeDayExperience && !form.slot) {
+    if (!form.slot) {
       setErrorMessage("Select a time slot.");
       return;
     }
@@ -380,7 +412,7 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
   return (
     <div
       style={{ left: "var(--app-sidebar-width, 0px)", width: "calc(100vw - var(--app-sidebar-width, 0px))" }}
-      className="fixed inset-y-0 right-0 z-9999 flex items-center justify-center bg-slate-950/40 p-4"
+      className="fixed inset-y-0 right-0 z-[9999] flex items-center justify-center bg-slate-950/40 p-4"
     >
       <div className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[#d9c9a0] bg-[#fff9ef] shadow-2xl">
         <div className="flex items-start justify-between border-b border-[#e6d7b6] bg-[#800000] px-6 py-5 text-white">
@@ -394,7 +426,7 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
         </div>
 
         <form onSubmit={handleSubmit} className="thin-scrollbar flex-1 overflow-y-auto px-6 py-5">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-1">
             <label className="flex flex-col gap-1">
               <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">ENROLLING FOR *</span>
               <select name="enrolling_for" value={form.enrolling_for} onChange={handleFieldChange} className="h-11 rounded-xl border border-[#d9c9a0] bg-white px-3 text-sm text-slate-800 outline-none">
@@ -406,20 +438,10 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">PDC CLASSIFICATION *</span>
-              <select name="pdc_classification" value={form.pdc_classification} onChange={handleFieldChange} className="h-11 rounded-xl border border-[#d9c9a0] bg-white px-3 text-sm text-slate-800 outline-none">
-                <option value="" disabled>Select Beginner or Experience</option>
-                {PDC_CLASSIFICATION_OPTIONS.map((item) => (
-                  <option key={item.value} value={item.value}>{item.label}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1 md:col-span-2">
-              <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">MODE OF TRAINING *</span>
-              <select name="training_method" value={form.training_method} onChange={handleFieldChange} className="h-11 rounded-xl border border-[#d9c9a0] bg-white px-3 text-sm text-slate-800 outline-none">
-                <option value="" disabled>Select mode of training</option>
-                {TRAINING_MODE_OPTIONS.map((item) => (
+              <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">TDC SOURCE *</span>
+              <select name="tdc_source" value={form.tdc_source} onChange={handleFieldChange} className="h-11 rounded-xl border border-[#d9c9a0] bg-white px-3 text-sm text-slate-800 outline-none">
+                <option value="" disabled>Select TDC source</option>
+                {tdcSourceOptions.map((item) => (
                   <option key={item.value} value={item.value}>{item.label}</option>
                 ))}
               </select>
@@ -430,27 +452,49 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
             IMPORTANT REMINDERS FOR PDC STUDENTS: PER DL CODES PO ANG ATING PDC. EVERY DL CODES MAGKAKAIBA ANG RATES AND SCHEDULE.
           </p>
 
+          {isExperienceCategory ? (
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">MARUNONG KA NA BANG MAGMANEHO, MANEUVERING/PARKING? *</span>
+                <select name="is_already_driver" value={form.is_already_driver} onChange={handleFieldChange} className="h-11 rounded-xl border border-[#d9c9a0] bg-white px-3 text-sm text-slate-800 outline-none">
+                  <option value="" disabled>Select yes or no</option>
+                  {yesNoOptions.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              {form.is_already_driver === "true" ? (
+                <>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">ANONG SASAKYAN ANG IMAMANEHO? *</span>
+                    <select name="target_vehicle" value={form.target_vehicle} onChange={handleFieldChange} className="h-11 rounded-xl border border-[#d9c9a0] bg-white px-3 text-sm text-slate-800 outline-none">
+                      <option value="" disabled>Select vehicle</option>
+                      {TARGET_VEHICLE_OPTIONS.map((item) => (
+                        <option key={item.value} value={item.value}>{item.label}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">ANONG KLASE NG TRANSMISSION? *</span>
+                    <select name="transmission_type" value={form.transmission_type} onChange={handleFieldChange} className="h-11 rounded-xl border border-[#d9c9a0] bg-white px-3 text-sm text-slate-800 outline-none">
+                      <option value="" disabled>Select transmission</option>
+                      {TRANSMISSION_OPTIONS.map((item) => (
+                        <option key={item.value} value={item.value}>{item.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              ) : (
+                <div className="rounded-xl border border-[#d9c9a0] bg-[#fff8e7] px-4 py-3 text-sm text-slate-700 md:col-span-1">
+                  Driving school and TDC completion details are enough for this selection.
+                </div>
+              )}
+            </div>
+          ) : null}
+
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">ANONG SASAKYAN ANG IMAMANEHO? *</span>
-              <select name="target_vehicle" value={form.target_vehicle} onChange={handleFieldChange} className="h-11 rounded-xl border border-[#d9c9a0] bg-white px-3 text-sm text-slate-800 outline-none">
-                <option value="" disabled>Select vehicle</option>
-                {TARGET_VEHICLE_OPTIONS.map((item) => (
-                  <option key={item.value} value={item.value}>{item.label}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">ANONG KLASE NG TRANSMISSION? *</span>
-              <select name="transmission_type" value={form.transmission_type} onChange={handleFieldChange} className="h-11 rounded-xl border border-[#d9c9a0] bg-white px-3 text-sm text-slate-800 outline-none">
-                <option value="" disabled>Select transmission</option>
-                {TRANSMISSION_OPTIONS.map((item) => (
-                  <option key={item.value} value={item.value}>{item.label}</option>
-                ))}
-              </select>
-            </label>
-
             <label className="flex flex-col gap-1">
               <span className="text-[11px] font-bold tracking-wide text-[#6b5b4d]">Driving School where you have taken your TDC *</span>
               <select name="driving_school_tdc" value={form.driving_school_tdc} onChange={handleFieldChange} className="h-11 rounded-xl border border-[#d9c9a0] bg-white px-3 text-sm text-slate-800 outline-none">
@@ -481,7 +525,7 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
                 <p className="mt-1 text-sm text-slate-500">Set the PDC schedule for promo enrollment.</p>
               </div>
               <span className="rounded-full bg-[#D4AF37]/20 px-3 py-1 text-xs font-semibold text-[#800000]">
-                {scheduleCourseLabel(form.pdc_classification)}
+                  {scheduleCourseLabel(courseType)}
               </span>
             </div>
 
@@ -544,7 +588,7 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
                     <button
                       key={item.slot}
                       type="button"
-                      disabled={Boolean(item.full) || isWholeDayExperience}
+                      disabled={Boolean(item.full)}
                       onClick={() => setForm((current) => ({ ...current, slot: item.slot }))}
                       className={`rounded-2xl border px-4 py-4 text-left transition ${
                         item.full
@@ -562,12 +606,6 @@ export default function SchedulePdcLaterModal({ isOpen, enrollment, onClose, onS
                   );
                 })}
               </div>
-
-              {isWholeDayExperience ? (
-                <p className="mt-3 rounded-xl border border-[#d9c9a0] bg-[#fff9ef] px-3 py-2 text-sm text-slate-700">
-                  Motorcycle experience session is reserved as whole-day schedule.
-                </p>
-              ) : null}
 
               {loadingAvailability ? (
                 <p className="mt-3 text-sm text-slate-500">Checking schedule availability...</p>

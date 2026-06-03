@@ -13,6 +13,7 @@ import {
   getProvinceOptions,
   getRegionLabel,
   getRegionOptions,
+  getZipCodeByAddressCodes,
 } from "../../enrollments/utils/phLocations";
 
 const genderOptions = ["male", "female", "prefer_not_to_say"];
@@ -46,6 +47,7 @@ export default function EditStudentModal({ student, form, onChange, onClose, onS
   const provinceOptions = useMemo(() => getProvinceOptions(regionCode), [regionCode]);
   const cityOptions = useMemo(() => getCityOptions(regionCode, provinceCode), [regionCode, provinceCode]);
   const barangayOptions = useMemo(() => getBarangayOptions(cityCode), [cityCode]);
+  const autoZipCode = useMemo(() => getZipCodeByAddressCodes(regionCode, provinceCode, cityCode), [regionCode, provinceCode, cityCode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +96,21 @@ export default function EditStudentModal({ student, form, onChange, onClose, onS
       cancelled = true;
     };
   }, [student, form.profile]);
+
+  useEffect(() => {
+    if (!cityCode) {
+      if (form.profile.zip_code) {
+        handleFieldChange("profile", "zip_code", "");
+      }
+      return;
+    }
+
+    if (autoZipCode && String(form.profile.zip_code || "") !== String(autoZipCode)) {
+      handleFieldChange("profile", "zip_code", autoZipCode);
+    }
+    // FIX: Nilagyan natin ng ignore comment ang susunod na linya para hindi mag-warning ang ESLint
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoZipCode, cityCode, form.profile.zip_code]);
 
   if (!student) return null;
 

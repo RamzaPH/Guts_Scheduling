@@ -10,6 +10,7 @@ import { resourceServices } from "../../../services/resources";
 import { fetchDailyReports } from "../../dashboard/services/dashboardApi";
 import ToastStack from "../../../shared/utils/ToastStack";
 import { calculateAge } from "../../../shared/utils/date";
+import { getPdcCategoryFromEnrollment, inferPdcCategory } from "../utils/pdcClassification";
 import {
   getBarangayLabel,
   getCityLabel,
@@ -105,12 +106,9 @@ function toNullableNumber(value) {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-function isExperiencePdcCategory(value) {
-  return String(value || "").trim().toLowerCase() === "experience";
-}
-
 function buildEnrollmentPayload(type, form) {
-  const isExperienceFlow = isExperiencePdcCategory(form.enrollment.pdc_category);
+  const pdcCategory = getPdcCategoryFromEnrollment(form.extras.enrolling_for, form.enrollment.training_method, form.enrollment.pdc_category);
+  const isExperienceFlow = String(pdcCategory || "").trim().toLowerCase() === "experience";
   const drivingSchoolTdc = form.extras.driving_school_tdc === "Other"
     ? (form.extras.driving_school_tdc_other || "").trim()
     : form.extras.driving_school_tdc;
@@ -204,7 +202,8 @@ function buildEnrollmentPayload(type, form) {
             ? promoTrainingMethod
             : "",
       pdc_start_mode: type === "PROMO" ? "later" : null,
-      pdc_category: type === "PDC" || type === "PROMO" ? form.enrollment.pdc_category : null,
+      pdc_category: type === "PDC" || type === "PROMO" ? pdcCategory : null,
+      pdc_type: type === "PDC" || type === "PROMO" ? (isExperienceFlow ? "experience" : "beginner") : null,
       status: "pending",
     },
     schedule: {
@@ -255,7 +254,11 @@ function isMotorcycleTargetVehicle(value) {
 function inferEnrollmentCourseType(type, form) {
   if (type === "TDC") return "tdc";
 
-  const pdcType = normalizeText(form.enrollment.pdc_type || form.enrollment.pdc_category);
+  const pdcType = normalizeText(
+    form.enrollment.pdc_type
+    || form.enrollment.pdc_category
+    || getPdcCategoryFromEnrollment(form.extras.enrolling_for, form.enrollment.training_method)
+  );
   return pdcType === "experience" ? "pdc_experience" : pdcType ? "pdc_beginner" : "";
 }
 
@@ -743,6 +746,33 @@ export default function EnrollmentsPage() {
         };
       }
 
+      if (section === "extras" && field === "enrolling_for") {
+        const inferredCategory = inferPdcCategory(value, current.enrollment.training_method);
+        return {
+          ...current,
+          extras: {
+            ...current.extras,
+            [field]: value,
+          },
+          enrollment: {
+            ...current.enrollment,
+            pdc_category: inferredCategory,
+          },
+        };
+      }
+
+      if (section === "enrollment" && field === "training_method") {
+        const inferredCategory = inferPdcCategory(current.extras.enrolling_for, value);
+        return {
+          ...current,
+          enrollment: {
+            ...current.enrollment,
+            [field]: value,
+            pdc_category: inferredCategory,
+          },
+        };
+      }
+
       if (field === "is_already_driver") {
         const isDriver = value === true || value === "true";
         return {
@@ -791,7 +821,6 @@ export default function EnrollmentsPage() {
           ...current.enrollment,
           client_type: "",
           training_method: "",
-          pdc_category: "",
         },
         extras: {
           ...current.extras,
@@ -806,7 +835,6 @@ export default function EnrollmentsPage() {
         ...current,
         enrollment: {
           ...current.enrollment,
-          pdc_category: "",
         },
         extras: {
           ...current.extras,
@@ -856,8 +884,10 @@ export default function EnrollmentsPage() {
       return;
     }
 
-    if (selectedType === "PDC" && !form.enrollment.pdc_category) {
-      addToast("PDC classification is required. Please select Beginner or Experience.");
+    const pdcCategory = getPdcCategoryFromEnrollment(form.extras.enrolling_for, form.enrollment.training_method, form.enrollment.pdc_category);
+
+    if (selectedType === "PDC" && !pdcCategory) {
+      addToast("Select an ENROLLING FOR option that determines the PDC track.");
       return;
     }
 
