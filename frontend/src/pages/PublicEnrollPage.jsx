@@ -594,9 +594,9 @@ export default function PublicEnrollPage() {
     const processedSections = [];
     const effectiveEnrollmentType = resolveQrEnrollmentType(template);
     
-    // TAMA NA ANG LOGIC DITO: Hinahanap natin diretso yung salitang "Experience" tulad sa Main Form
     const selectedEnrollingFor = formData.extras?.enrolling_for || "";
-    const isExperiencePdc = selectedEnrollingFor.toLowerCase().includes("experience");
+    // FIX APPLIED HERE: Changed "experience" to "experienced"
+    const isExperiencePdc = selectedEnrollingFor.toLowerCase().includes("experienced");
     const isDriver = normalizeBooleanValue(formData.enrollment?.is_already_driver);
 
     for (const section of sourceSections) {
@@ -639,7 +639,7 @@ export default function PublicEnrollPage() {
     }
 
     return processedSections;
-  }, [template, promoOptions, formData]); // Idinagdag ang formData sa dependencies para mag-update agad ang UI
+  }, [template, promoOptions, formData]);
 
   const promoModalRef = useRef(null);
 
