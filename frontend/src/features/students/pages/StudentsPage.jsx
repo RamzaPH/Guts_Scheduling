@@ -14,6 +14,8 @@ const DeleteConfirmationDialog = lazy(() => import("../components/DeleteConfirma
 const StatusUpdateModal = lazy(() => import("../components/StatusUpdateModal"));
 const BulkStatusUpdateModal = lazy(() => import("../components/BulkStatusUpdateModal"));
 const OnlineTdcImportModal = lazy(() => import("../components/OnlineTdcImportModal"));
+// BAGONG IMPORT PARA SA SCHEDULE MODAL
+const StudentScheduleModal = lazy(() => import("../components/StudentScheduleModal"));
 
 function StudentsPage() {
   const { role } = useAuth();
@@ -21,6 +23,9 @@ function StudentsPage() {
   const focusedStudentId = searchParams.get("focusStudentId");
   const view = searchParams.get("view") || "overall";
   const [isExporting, setIsExporting] = useState(false);
+
+  // BAGONG STATE PARA I-TRACK KUNG KANINONG SCHEDULE ANG BUBUKSAN
+  const [scheduleModalStudent, setScheduleModalStudent] = useState(null);
 
   const {
     search,
@@ -255,6 +260,8 @@ function StudentsPage() {
         onView={setSelectedStudent}
         onEdit={openEditModal}
         onUpdateStatus={openStatusUpdateModal}
+        // BAGONG PROP PASSED TO TABLE
+        onViewSchedule={setScheduleModalStudent}
         onDelete={setDeletingStudent}
         canDelete={role === "admin"}
         onClickPendingBadge={quickApprovePendingStudent}
@@ -324,6 +331,14 @@ function StudentsPage() {
             refetchStudents();
           }}
         />
+
+        {/* BAGONG MODAL KUNG MAY NAPILING STUDENT PARA SA SCHEDULE */}
+        {scheduleModalStudent && (
+          <StudentScheduleModal
+            student={scheduleModalStudent}
+            onClose={() => setScheduleModalStudent(null)}
+          />
+        )}
       </Suspense>
     </section>
   );

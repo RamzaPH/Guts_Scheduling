@@ -15,11 +15,9 @@ function getPendingDesiredDate(enrollment) {
   if (enrollmentType === "PDC") {
     return enrollment?.pdc_desired_date || enrollment?.promo_schedule_pdc?.schedule_date || "";
   }
-
   if (enrollmentType === "TDC") {
     return enrollment?.tdc_completion_deadline || enrollment?.promo_schedule_tdc?.schedule_date || "";
   }
-
   return enrollment?.pdc_desired_date || enrollment?.tdc_completion_deadline || "";
 }
 
@@ -29,6 +27,16 @@ export default function PendingQREnrollmentsPage() {
   const [error, setError] = useState("");
   const [editingEnrollment, setEditingEnrollment] = useState(null);
   const [toastMsg, setToastMsg] = useState("");
+  
+  // ✅ FIX: Gumamit na tayo ng localStorage para hindi mawala pag nag-refresh!
+  const [reviewedIds, setReviewedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem("reviewedQREnrollments");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   async function loadPendingEnrollments() {
     const data = await api.get("/admin/enrollments/pending");
@@ -37,12 +45,10 @@ export default function PendingQREnrollmentsPage() {
 
   useEffect(() => {
     let cancelled = false;
-
     async function loadQueue() {
       try {
         setError("");
         const data = await loadPendingEnrollments();
-
         if (!cancelled) {
           setEnrollments(data);
         }
@@ -56,34 +62,27 @@ export default function PendingQREnrollmentsPage() {
         }
       }
     }
-
     loadQueue();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   function handleReview(enrollment) {
     setEditingEnrollment(enrollment);
   }
 
-  function handleEditSaveComplete(message) {
+  function handleEditSaveComplete(message, id) {
     setToastMsg(message);
     setTimeout(() => setToastMsg(""), 3000);
 
-    // Refresh the list after editing
-    setTimeout(() => {
-      async function reloadEnrollments() {
-        try {
-          const data = await loadPendingEnrollments();
-          setEnrollments(data);
-          setError("");
-        } catch (err) {
-          setError(err?.message || "Failed to load pending QR enrollments.");
-        }
-      }
-      reloadEnrollments();
-    }, 500);
+    // ✅ FIX: I-save sa state AT sa localStorage
+    if (id) {
+      setReviewedIds((prev) => {
+        if (prev.includes(id)) return prev; // Para hindi madoble
+        const updated = [...prev, id];
+        localStorage.setItem("reviewedQREnrollments", JSON.stringify(updated));
+        return updated;
+      });
+    }
   }
 
   return (
@@ -103,22 +102,18 @@ export default function PendingQREnrollmentsPage() {
           <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Pending QR enrollments</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Review the public submissions captured through QR. Approve one and the workflow immediately opens the payment handoff.
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                Review the public submissions captured through QR. Once you review and save the changes, it will move to the Pending Approvals page for payment.
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3 lg:w-[360px]">
+            <div className="grid gap-3 sm:grid-cols-2 lg:w-[280px]">
               <div className="card-light flex h-full min-h-[96px] flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Queued</p>
-                <p className="mt-2 text-2xl font-bold text-slate-950">{enrollments.length}</p>
+                <p className="mt-2 text-2xl font-bold text-slate-950">{Math.max(0, enrollments.length - reviewedIds.length)}</p>
               </div>
               <div className="card-light flex h-full min-h-[96px] flex-col justify-between overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Review</p>
-                <p className="mt-2 text-2xl font-bold text-slate-950">{enrollments.filter((item) => !item.reviewed_at).length}</p>
-              </div>
-              <div className="card-light flex h-full min-h-[96px] flex-col justify-between overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Action</p>
-                <p className="mt-2 text-base font-bold leading-tight text-slate-950 sm:text-lg">Approve</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Action</p>
+                <p className="mt-2 text-base font-bold leading-tight text-slate-950 sm:text-lg">Review</p>
               </div>
             </div>
           </div>
@@ -147,7 +142,7 @@ export default function PendingQREnrollmentsPage() {
           <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm card-light">
             <div className="border-b border-slate-200 px-5 py-4">
               <p className="text-sm font-semibold text-slate-900">Queue details</p>
-              <p className="text-xs text-slate-500">The enrollment status changes to confirmed after approval.</p>
+              <p className="text-xs text-slate-500">The enrollment moves to Pending Approvals after your review.</p>
             </div>
 
             <div className="thin-scrollbar overflow-auto">
@@ -159,50 +154,68 @@ export default function PendingQREnrollmentsPage() {
                     <th className="px-5 py-4">QR Source</th>
                     <th className="px-5 py-4">Amount</th>
                     <th className="px-5 py-4">Submitted</th>
-                    <th className="px-5 py-4">Action</th>
+                    <th className="px-5 py-4">
+                      <div className="flex flex-col">
+                        <span>Action</span>
+                        {reviewedIds.length > 0 && (
+                          <span className="mt-1 w-max rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                            {reviewedIds.length} Reviewed
+                          </span>
+                        )}
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {enrollments.map((enrollment) => (
-                    <tr key={enrollment.id} className="align-top hover:bg-slate-50/70">
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-slate-950">#{enrollment.id}</div>
-                        <div className="text-xs text-slate-500">{enrollment.enrollment_type || enrollment.client_type || "QR submission"}</div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-slate-900">
-                          {getStudentFullName(enrollment.student || enrollment.Student)}
-                        </div>
-                        <div className="text-xs text-slate-500">{enrollment.student?.email || enrollment.profile?.gmail_account || "-"}</div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-slate-900">{enrollment.qrCode?.name || "-"}</div>
-                        <div className="text-xs text-slate-500">{enrollment.qrCode?.token || "-"}</div>
-                        {getPendingDesiredDate(enrollment) ? (
-                          <div className="mt-1 text-xs font-medium text-[#800000]">
-                            Desired Date: {getPendingDesiredDate(enrollment)}
+                  {enrollments.map((enrollment) => {
+                    const isReviewed = reviewedIds.includes(enrollment.id);
+
+                    return (
+                      <tr key={enrollment.id} className="align-top hover:bg-slate-50/70">
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-slate-950">#{enrollment.id}</div>
+                          <div className="text-xs text-slate-500">{enrollment.enrollment_type || enrollment.client_type || "QR submission"}</div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-slate-900">
+                            {getStudentFullName(enrollment.student || enrollment.Student)}
                           </div>
-                        ) : null}
-                      </td>
-                      <td className="px-5 py-4 text-slate-700">{moneyLabel(enrollment.payment_summary?.total_due || enrollment.fee_amount)}</td>
-                      <td className="px-5 py-4 text-slate-700">
-                        <div className="flex items-center gap-2">
-                          <Clock3 size={14} className="text-slate-400" />
-                          {enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleString() : "-"}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <button
+                          <div className="text-xs text-slate-500">{enrollment.student?.email || enrollment.profile?.gmail_account || "-"}</div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-slate-900">{enrollment.qrCode?.name || "-"}</div>
+                          <div className="text-xs text-slate-500">{enrollment.qrCode?.token || "-"}</div>
+                          {getPendingDesiredDate(enrollment) ? (
+                            <div className="mt-1 text-xs font-medium text-[#800000]">
+                              Desired Date: {getPendingDesiredDate(enrollment)}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-5 py-4 text-slate-700">{moneyLabel(enrollment.payment_summary?.total_due || enrollment.fee_amount)}</td>
+                        <td className="px-5 py-4 text-slate-700">
+                          <div className="flex items-center gap-2">
+                            <Clock3 size={14} className="text-slate-400" />
+                            {enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleString() : "-"}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <button
                             type="button"
                             onClick={() => handleReview(enrollment)}
-                            className="inline-flex items-center gap-2 rounded-full bg-[#800000] px-4 py-2 text-xs font-semibold text-white shadow-[0_12px_28px_rgba(128,0,0,0.2)] transition hover:bg-[#680000]"
+                            disabled={isReviewed}
+                            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-white transition ${
+                              isReviewed 
+                                ? "bg-slate-400 cursor-not-allowed opacity-70" 
+                                : "bg-[#800000] shadow-[0_12px_28px_rgba(128,0,0,0.2)] hover:bg-[#680000]"
+                            }`}
                           >
-                            <ArrowRight size={14} />
-                            Review
+                            {!isReviewed && <ArrowRight size={14} />}
+                            {isReviewed ? "Reviewed" : "Review"}
                           </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

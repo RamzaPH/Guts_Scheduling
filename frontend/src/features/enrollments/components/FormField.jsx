@@ -1,4 +1,5 @@
-const baseFieldClassName = "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-[#800000]";
+// ✅ FIX: Dinagdag ko ang `uppercase` utility class sa dulo ng baseFieldClassName
+const baseFieldClassName = "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-[#800000] uppercase";
 
 export function FormField({
   label,
@@ -33,7 +34,7 @@ export function FormField({
 
   return (
     <label className={`flex flex-col gap-1 ${className}`.trim()}>
-      <span className="text-[10px] font-bold tracking-wide text-slate-500">
+      <span className="text-[10px] font-bold tracking-wide text-slate-500 uppercase">
         {label}
         {required ? " *" : ""}
       </span>
@@ -42,12 +43,13 @@ export function FormField({
         value={value ?? ""}
         onChange={handleChange}
         type={effectiveType}
-        placeholder={placeholder}
+        placeholder={placeholder ? placeholder.toUpperCase() : ""}
         required={required}
         inputMode={effectiveInputMode}
         maxLength={effectiveMaxLength}
         readOnly={readOnly}
-        className={`${baseFieldClassName} ${inputClassName}`.trim()}
+        // Kung hindi text (gaya ng date, i-remove ang uppercase param)
+        className={`${baseFieldClassName} ${effectiveType !== "text" && effectiveType !== "email" ? "normal-case" : ""} ${inputClassName}`.trim()}
       />
     </label>
   );
@@ -66,7 +68,7 @@ export function SelectField({
 }) {
   return (
     <label className={`flex flex-col gap-1 ${className}`.trim()}>
-      <span className="text-[10px] font-bold tracking-wide text-slate-500">
+      <span className="text-[10px] font-bold tracking-wide text-slate-500 uppercase">
         {label}
         {required ? " *" : ""}
       </span>
@@ -77,12 +79,13 @@ export function SelectField({
         required={required}
         className={`${baseFieldClassName} ${inputClassName}`.trim()}
       >
-        <option value="" disabled>
-          {placeholder}
+        <option value="" disabled className="uppercase">
+          {placeholder ? placeholder.toUpperCase() : "SELECT..."}
         </option>
+        {/* ✅ FIX: Fino-force na ALL CAPS lahat ng laman ng dropdown options */}
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
+          <option key={option.value} value={option.value} className="uppercase">
+            {typeof option.label === "string" ? option.label.toUpperCase() : option.label}
           </option>
         ))}
       </select>
@@ -91,5 +94,5 @@ export function SelectField({
 }
 
 export function SectionTitle({ children }) {
-  return <h3 className="mb-3 mt-5 border-b border-slate-300 pb-2 text-xs font-bold tracking-[0.12em] text-blue-700">{children}</h3>;
+  return <h3 className="mb-3 mt-5 border-b border-slate-300 pb-2 text-xs font-bold tracking-[0.12em] text-blue-700 uppercase">{children}</h3>;
 }

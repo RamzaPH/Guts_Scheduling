@@ -297,9 +297,16 @@ async function getOperationsSnapshot({ daysAhead = 7, limit = 50 } = {}) {
 }
 
 async function getPendingApprovals(limit = 100) {
+  // Kunin lahat ng naka-pending
   const rows = await repository.findPendingEnrollmentApprovals(limit);
 
-  const items = rows.map((row) => {
+  // ✅ FIX: I-filter out ang mga may enrollment_channel na "qr_public"
+  // Dahil dapat ay sa "Pending QR Enrollments" lang sila lalabas.
+  const filteredRows = rows.filter((row) => {
+    return row.enrollment_channel !== "qr_public";
+  });
+
+  const items = filteredRows.map((row) => {
     const student = row.Student ? (row.Student.toJSON ? row.Student.toJSON() : row.Student) : null;
     const enrollment = row.toJSON ? row.toJSON() : row;
     const studentName = student

@@ -22,13 +22,18 @@ export default function PendingEnrollmentsPage() {
     queryFn: async () => {
       const all = await resourceServices.enrollments.list();
       return (all || []).filter((e) => {
-        // Only include pending enrollments from QR/manual enrollment (not OTDC/SafeRoads)
+        // Only include pending enrollments from manual enrollment (not OTDC/SafeRoads and NOT QR public)
         const isPending = String(e?.status || "") === "pending";
         const hasStudent = e?.student || e?.Student;
         const studentRecord = e?.student || e?.Student;
         const source = getStudentSourceLabel(studentRecord);
-        const isQrOrManual = source === "Walk-in"; // Only walk-in students (QR/manual enrollment)
-        return isPending && hasStudent && isQrOrManual;
+        const isQrOrManual = source === "Walk-in"; 
+        
+        // ✅ FIX: I-exclude ang mga galing sa Public QR Enrollment form
+        // Dahil dapat doon muna sila sa "Pending QR Enrollments" page para ma-review.
+        const isNotFromPublicQr = e?.enrollment_channel !== "qr_public";
+
+        return isPending && hasStudent && isQrOrManual && isNotFromPublicQr;
       });
     },
     staleTime: 5000,
@@ -46,7 +51,6 @@ export default function PendingEnrollmentsPage() {
     },
   });
 
-  // TAMA NA PARAAN: Ibabalik lang ng useMemo ang options, walang setState na mangyayari
   const promoOfferOptions = useMemo(() => {
     return (promoOffers || []).map((po) => ({
       value: po.id,

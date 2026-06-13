@@ -209,8 +209,6 @@ export function useStudentsPageLogic(options = {}) {
   const { data, isLoading, isError, error } = useStudentsList({ includeExternal, source });
   const students = useMemo(() => data || [], [data]);
 
-
-
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }) => updateStudent(id, payload),
     onSuccess: async () => {
@@ -303,7 +301,6 @@ export function useStudentsPageLogic(options = {}) {
     },
   });
 
-  // Compute summary based on current filter
   const summary = useMemo(() => {
     const filtered = students.filter((student) => matchesCourseFilter(student, courseFilter));
 
@@ -530,8 +527,9 @@ export function useStudentsPageLogic(options = {}) {
       return;
     }
 
-    if (bulkSelectionMeta.promo > 0 && (!bulkStatusForm.promoTdcOutcome || !bulkStatusForm.promoPdcOutcome)) {
-      addToast("Please choose both Promo TDC and Promo PDC outcomes.", "error");
+    // ✅ FIXED: Pwede na makapag-update kahit isa lang (TDC o PDC) ang pinili sa Promo.
+    if (bulkSelectionMeta.promo > 0 && (!bulkStatusForm.promoTdcOutcome && !bulkStatusForm.promoPdcOutcome)) {
+      addToast("Please choose at least one outcome (TDC or PDC) for Promo students.", "error");
       return;
     }
 
@@ -563,13 +561,19 @@ export function useStudentsPageLogic(options = {}) {
         }
 
         if (course === "PROMO") {
-          const promoTdcOutcome = bulkStatusForm.promoTdcOutcome;
-          const promoPdcOutcome = bulkStatusForm.promoPdcOutcome;
+          // ✅ FIXED: Kukuhain niya kung ano yung existing data sa database tapos io-override lang yung binago mo.
+          const latestEnrollment = getLatestEnrollment(student);
+          const parsedScore = parseScoreValue(latestEnrollment?.score);
+          
+          const promoTdcOutcome = bulkStatusForm.promoTdcOutcome || parsedScore.promoTdcOutcome || "";
+          const promoPdcOutcome = bulkStatusForm.promoPdcOutcome || parsedScore.promoPdcOutcome || "";
+          
           const mappedFromPdc = mapOutcomeToEnrollmentStatus(promoPdcOutcome);
           const mappedFromTdc = mapOutcomeToEnrollmentStatus(promoTdcOutcome);
+          
           const enrollmentStatus =
-            mappedFromPdc === "completed" || mappedFromTdc === "completed"
-              ? "completed"
+            mappedFromPdc === "completed" && mappedFromTdc === "completed"
+              ? "completed" // Dapat parehong completed para maging "completed" ang buong enrollment
               : mappedFromPdc === "pending" || mappedFromTdc === "pending"
                 ? "pending"
                 : "confirmed";
@@ -659,8 +663,6 @@ export function useStudentsPageLogic(options = {}) {
     const supportsPromoSections = courseCode === "PROMO" || hasPromoStatusContext(updatingStatusStudent);
 
     if (supportsPromoSections) {
-      // Allow saving when at least one of TDC or PDC outcome is set.
-      // This enables saving TDC outcome even when PDC is not yet set.
       if (!statusForm.promoTdcOutcome && !statusForm.promoPdcOutcome) {
         addToast("For Promo students, please set at least one of TDC or PDC outcomes.", "error");
         return;
@@ -678,9 +680,10 @@ export function useStudentsPageLogic(options = {}) {
     if (isCancellingEnrollment) {
       mappedEnrollmentStatus = "cancelled";
     } else if (supportsPromoSections) {
-      // If PDC outcome is present, use it to determine final enrollment status.
-      // If only TDC outcome is set (PDC pending), keep existing enrollment status to avoid marking enrollment completed.
-      if (statusForm.promoPdcOutcome) {
+      if (statusForm.promoPdcOutcome && statusForm.promoTdcOutcome) {
+         // Parehong tapos na
+         mappedEnrollmentStatus = mapOutcomeToEnrollmentStatus(statusForm.promoPdcOutcome);
+      } else if (statusForm.promoPdcOutcome) {
         mappedEnrollmentStatus = mapOutcomeToEnrollmentStatus(statusForm.promoPdcOutcome);
       } else if (statusForm.promoTdcOutcome) {
         const latest = getLatestEnrollment(updatingStatusStudent);

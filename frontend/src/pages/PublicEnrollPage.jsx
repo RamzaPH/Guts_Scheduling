@@ -71,8 +71,9 @@ function getAddressOptions(fieldName, formData) {
   return [];
 }
 
+// ✅ FIX: In-add natin ang `uppercase` dito sa baseClasses para sa lahat ng custom inputs
 function FieldControl({ field, value, onChange, formData }) {
-  const baseClasses = "mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10";
+  const baseClasses = "mt-2 w-full uppercase rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10";
   const isContactNumberField = String(field?.name || "").includes("phone") || String(field?.name || "").includes("contact_number");
   const contactInputProps = isContactNumberField
     ? { inputMode: "numeric", maxLength: 11, pattern: "[0-9]*" }
@@ -80,7 +81,7 @@ function FieldControl({ field, value, onChange, formData }) {
 
    if (field.type === "note") {
      return (
-       <div className="mt-2 w-full rounded-2xl border border-[#d9c9a0] bg-white px-4 py-3 text-sm text-slate-600">
+       <div className="mt-2 w-full uppercase rounded-2xl border border-[#d9c9a0] bg-white px-4 py-3 text-sm text-slate-600">
          {field.content}
        </div>
      );
@@ -116,18 +117,18 @@ function FieldControl({ field, value, onChange, formData }) {
         className={baseClasses}
         disabled={isDisabled}
       >
-        <option value="">
+        <option value="" className="uppercase">
           {field.name === "profile.province"
-            ? (formData?.extras?.region ? "Select Province" : "Select region first")
+            ? (formData?.extras?.region ? "SELECT PROVINCE" : "SELECT REGION FIRST")
             : field.name === "profile.city"
-              ? (formData?.profile?.province ? "Select City / Municipality" : "Select province first")
+              ? (formData?.profile?.province ? "SELECT CITY / MUNICIPALITY" : "SELECT PROVINCE FIRST")
               : field.name === "profile.barangay"
-                ? (formData?.profile?.city ? "Select Barangay / District" : "Select city / municipality first")
-                : "Select..."}
+                ? (formData?.profile?.city ? "SELECT BARANGAY / DISTRICT" : "SELECT CITY / MUNICIPALITY FIRST")
+                : "SELECT..."}
         </option>
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
+          <option key={option.value} value={option.value} className="uppercase">
+            {String(option.label || "").toUpperCase()}
           </option>
         ))}
       </select>
@@ -158,13 +159,13 @@ function FieldControl({ field, value, onChange, formData }) {
         disabled={field.disabled}
         className={baseClasses}
       >
-        <option value="">Select...</option>
+        <option value="" className="uppercase">SELECT...</option>
         {(field.options || []).map((option) => {
           const normalizedOption = typeof option === "string" ? { value: option, label: option } : option;
 
           return (
-            <option key={normalizedOption.value} value={normalizedOption.value}>
-              {normalizedOption.label}
+            <option key={normalizedOption.value} value={normalizedOption.value} className="uppercase">
+              {String(normalizedOption.label || "").toUpperCase()}
             </option>
           );
         })}
@@ -175,13 +176,14 @@ function FieldControl({ field, value, onChange, formData }) {
   return (
     <input
       name={field.name}
-        type={isContactNumberField ? "tel" : (field.type || "text")}
+      type={isContactNumberField ? "tel" : (field.type || "text")}
       value={value ?? ""}
       onChange={onChange}
       required={field.required}
       readOnly={field.readOnly}
-        {...contactInputProps}
-      className={baseClasses}
+      {...contactInputProps}
+      // Kung petsa (date), tanggalin ang uppercase class dahil masisira ang format ng calendar browser
+      className={`${baseClasses} ${field.type === "date" ? "normal-case" : ""}`}
     />
   );
 }
@@ -428,11 +430,20 @@ export default function PublicEnrollPage() {
     };
   }, [token]);
 
+  // ✅ FIX: Siguraduhin na ALL CAPS kapag nagta-type ka at ilalagay sa formData
   function handleChange(event) {
-    const { name, value } = event.target;
-    const normalizedValue = String(name || "").includes("phone") || String(name || "").includes("contact_number")
-      ? value.replace(/\D/g, "").slice(0, 11)
-      : value;
+    const { name, value, type } = event.target;
+    
+    // Ignore uppercase for phone/numbers
+    const isContactField = String(name || "").includes("phone") || String(name || "").includes("contact_number");
+    
+    let normalizedValue = value;
+    if (isContactField) {
+      normalizedValue = value.replace(/\D/g, "").slice(0, 11);
+    } else if (type === "text" || type === "textarea" || type === "email") {
+      normalizedValue = value.toUpperCase();
+    }
+
     setFormData((current) => {
       let next = createNestedValue(current, name, normalizedValue);
       next = clearDependentAddressFields(name, next);
@@ -595,7 +606,6 @@ export default function PublicEnrollPage() {
     const effectiveEnrollmentType = resolveQrEnrollmentType(template);
     
     const selectedEnrollingFor = formData.extras?.enrolling_for || "";
-    // FIX APPLIED HERE: Changed "experience" to "experienced"
     const isExperiencePdc = selectedEnrollingFor.toLowerCase().includes("experienced");
     const isDriver = normalizeBooleanValue(formData.enrollment?.is_already_driver);
 
@@ -697,7 +707,7 @@ export default function PublicEnrollPage() {
                 <ShieldCheck size={14} />
                 Public QR Enrollment
               </p>
-              <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+              <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl uppercase">
                 {template?.name || "Enrollment Form"}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
@@ -707,7 +717,7 @@ export default function PublicEnrollPage() {
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
               <div className="font-semibold text-slate-900">Status</div>
-              <div>{submitState === "done" ? "Submitted" : token ? "Open" : "Locked"}</div>
+              <div className="uppercase font-bold">{submitState === "done" ? "Submitted" : token ? "Open" : "Locked"}</div>
             </div>
           </div>
 
@@ -728,7 +738,7 @@ export default function PublicEnrollPage() {
                   <div className="public-qr-section rounded-[28px] border border-slate-200 bg-slate-50 p-5 card-light">
                     <div className="flex flex-col gap-1 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
                       <div>
-                        <h2 className="text-lg font-bold text-slate-950">{section.title}</h2>
+                        <h2 className="text-lg font-bold text-slate-950 uppercase">{section.title}</h2>
                         {section.description ? <p className="text-sm text-slate-600">{section.description}</p> : null}
                       </div>
                       <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
@@ -740,7 +750,7 @@ export default function PublicEnrollPage() {
                       {fieldsToRender.map((field) => (
                         <label key={field.name || field.content} className={field.type === "textarea" || field.type === "note" ? "md:col-span-2" : ""}>
                           {field.type !== "note" ? (
-                            <span className="text-sm font-semibold text-slate-700">
+                            <span className="text-sm font-semibold text-slate-700 uppercase">
                               {field.label}
                               {field.required ? <span className="ml-1 text-[#800000]">*</span> : null}
                             </span>
@@ -761,7 +771,7 @@ export default function PublicEnrollPage() {
               })}
 
               {status ? (
-                <div className={`rounded-2xl border px-4 py-3 text-sm ${submitState === "done" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-700"} card-light`}>
+                <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold uppercase ${submitState === "done" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-700"} card-light`}>
                   {submitState === "done" ? <CheckCircle2 className="mr-2 inline-block" size={16} /> : null}
                   {status}
                 </div>
@@ -774,7 +784,7 @@ export default function PublicEnrollPage() {
                 <button
                   type="submit"
                   disabled={submitState === "submitting" || loading}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#800000] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(128,0,0,0.22)] transition hover:bg-[#680000] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#800000] px-5 py-3 text-sm font-bold uppercase text-white shadow-[0_18px_40px_rgba(128,0,0,0.22)] transition hover:bg-[#680000] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitState === "submitting" ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
                   Submit enrollment
@@ -786,20 +796,20 @@ export default function PublicEnrollPage() {
           {!loading && submitState === "done" ? (
             <div className="mt-8 rounded-[28px] border border-emerald-200 bg-emerald-50/60 p-8 text-center card-light">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Enrollment Complete</p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl uppercase">
                 Your enrollment has been recorded.
               </h2>
               <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
                 Thank you. Your submission is now in the review queue. You may submit another response for a new enrollment.
               </p>
-              <p className="mx-auto mt-3 max-w-2xl rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+              <p className="mx-auto mt-3 max-w-2xl rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 font-semibold uppercase">
                 Encoder/staff will assign the instructor, time slot, and final schedule details after review.
               </p>
 
               <button
                 type="button"
                 onClick={resetForAnotherResponse}
-                className="mt-6 text-sm font-medium text-sky-700 underline underline-offset-2 transition hover:text-sky-800"
+                className="mt-6 text-sm font-bold uppercase text-[#800000] underline underline-offset-2 transition hover:text-[#680000]"
               >
                 Submit Another Response
               </button>
@@ -810,25 +820,25 @@ export default function PublicEnrollPage() {
             <div className="fixed inset-0 z-50 flex items-center justify-center">
               <div className="absolute inset-0 bg-black/40" onClick={() => { setShowPromoPrompt(false); setWantsPromo(null); }} />
               <div ref={promoModalRef} tabIndex={-1} className="relative mx-4 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-lg">
-                <h3 className="text-lg font-bold">Would you like to add an additional promo?</h3>
+                <h3 className="text-lg font-bold uppercase">Would you like to add an additional promo?</h3>
                 <p className="mt-2 text-sm text-slate-600">Choose one promo from the website list, including promos that apply to this enrollment type.</p>
 
                 <div className="mt-4 flex gap-3">
                   <button
                     type="button"
                     onClick={() => { setWantsPromo(true); }}
-                    className={`rounded-lg px-4 py-2 ${wantsPromo === true ? "bg-[#800000] text-white" : "border bg-white text-slate-700"}`}
+                    className={`rounded-lg px-4 py-2 font-bold uppercase ${wantsPromo === true ? "bg-[#800000] text-white" : "border bg-white text-slate-700"}`}
                   >Yes</button>
                   <button
                     type="button"
                     onClick={() => { setWantsPromo(false); setSelectedPromos([]); }}
-                    className={`rounded-lg px-4 py-2 ${wantsPromo === false ? "bg-[#800000] text-white" : "border bg-white text-slate-700"}`}
+                    className={`rounded-lg px-4 py-2 font-bold uppercase ${wantsPromo === false ? "bg-[#800000] text-white" : "border bg-white text-slate-700"}`}
                   >No</button>
                 </div>
 
                 {wantsPromo ? (
                   <div className="mt-4 max-h-[60vh] overflow-auto pr-1">
-                    <div className="text-sm text-slate-700">Select a promo to add:</div>
+                    <div className="text-sm font-semibold uppercase text-slate-700">Select a promo to add:</div>
                     <div className="mt-2 grid gap-2">
                       {promoOptions.map((opt) => {
                         const isSelected = selectedPromos.includes(opt.value);
@@ -840,11 +850,11 @@ export default function PublicEnrollPage() {
                             className={`flex w-full items-center justify-between rounded-lg border p-3 text-left transition ${isSelected ? "border-[#800000] bg-[#800000]/5" : "border-slate-200 bg-white hover:bg-slate-50"}`}
                           >
                             <div>
-                              <div className="text-sm font-semibold text-slate-900">{opt.label}</div>
-                              <div className="text-xs text-slate-500">{opt.is_applicable ? "Applicable to this form" : "Selectable as an additional promo"}</div>
+                              <div className="text-sm font-bold uppercase text-slate-900">{String(opt.label).toUpperCase()}</div>
+                              <div className="text-xs font-semibold uppercase text-slate-500">{opt.is_applicable ? "APPLICABLE TO THIS FORM" : "SELECTABLE AS AN ADDITIONAL PROMO"}</div>
                             </div>
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${opt.is_applicable ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                              {isSelected ? "Selected" : "Choose"}
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${opt.is_applicable ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                              {isSelected ? "SELECTED" : "CHOOSE"}
                             </span>
                           </button>
                         );
@@ -857,7 +867,7 @@ export default function PublicEnrollPage() {
                   <button
                     type="button"
                     onClick={() => { setShowPromoPrompt(false); setWantsPromo(null); }}
-                    className="rounded-lg border bg-white px-4 py-2 text-sm text-slate-700"
+                    className="rounded-lg border bg-white px-4 py-2 text-sm font-bold uppercase text-slate-700"
                   >Cancel</button>
                   <button
                     type="button"
@@ -872,7 +882,7 @@ export default function PublicEnrollPage() {
                       if (!payload) return;
                       await submitPayload(payload);
                     }}
-                    className="rounded-lg bg-[#800000] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg bg-[#800000] px-4 py-2 text-sm font-bold uppercase text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >Continue</button>
                 </div>
               </div>
@@ -882,8 +892,8 @@ export default function PublicEnrollPage() {
 
         <aside className="space-y-6 lg:order-2">
           <div className="public-qr-sidebar-card rounded-[28px] border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.22)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-rose-200">Workflow</p>
-            <ol className="mt-4 space-y-3 text-sm text-slate-200">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-rose-200">Workflow</p>
+            <ol className="mt-4 space-y-3 text-sm text-slate-200 uppercase font-medium">
               <li className="rounded-2xl border border-white/10 bg-white/5 p-4">1. Scan the QR code from the admin desk or flyer.</li>
               <li className="rounded-2xl border border-white/10 bg-white/5 p-4">2. Complete the form on your own device.</li>
               <li className="rounded-2xl border border-white/10 bg-white/5 p-4">3. Wait for sub-admin approval, then proceed to payment.</li>
@@ -891,18 +901,18 @@ export default function PublicEnrollPage() {
           </div>
 
           <div className="public-qr-sidebar-card rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm card-light">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">What happens next</p>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-400">What happens next</p>
             <div className="mt-4 space-y-4 text-sm text-slate-600">
               <div>
-                <div className="font-semibold text-slate-900">Review</div>
+                <div className="font-bold text-slate-900 uppercase">Review</div>
                 <p>The QR submission goes to the sub-admin queue with the linked QR code record.</p>
               </div>
               <div>
-                <div className="font-semibold text-slate-900">Approval</div>
+                <div className="font-bold text-slate-900 uppercase">Approval</div>
                 <p>Once approved, the enrollment status becomes confirmed and the payment handoff opens.</p>
               </div>
               <div>
-                <div className="font-semibold text-slate-900">Payment</div>
+                <div className="font-bold text-slate-900 uppercase">Payment</div>
                 <p>The payment page records the first transaction and closes out the enrollment when fully paid.</p>
               </div>
             </div>

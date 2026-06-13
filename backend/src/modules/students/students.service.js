@@ -351,7 +351,6 @@ async function ensureImportedTdcEnrollment(studentId, mappedRow, source, transac
   const lifecycle = mappedRow?.lifecycle || {};
   const startedAt = lifecycle.startedAt || lifecycle.completedAt || new Date();
   const completedAt = lifecycle.completedAt || startedAt;
-  // For imported students, always mark as completed since they're imported from an external source system
   const existingDlCode = await enrollmentRepository.findDlCodeByCode("TDC", transaction);
   const dlCode = existingDlCode || await enrollmentRepository.createDlCode({ code: "TDC", description: "TDC" }, transaction);
   const feeAmount = 599;
@@ -390,7 +389,6 @@ async function ensureImportedTdcEnrollment(studentId, mappedRow, source, transac
     transaction
   );
 
-  // Always create a Payment record for imported students (they're pre-paid from the external system)
   await Payment.create(
     {
       enrollment_id: enrollment.id,
@@ -597,6 +595,7 @@ async function editStudent(id, payload) {
   }
 }
 
+// ✅ FIX: Ginawa nating HARD DELETE para mawala na nang tuluyan ang mga multong schedules!
 async function removeStudent(id) {
   const transaction = await sequelize.transaction();
 
@@ -608,31 +607,45 @@ async function removeStudent(id) {
       throw error;
     }
 
-    const enrollments = await repository.findEnrollmentsByStudentId(id, transaction);
-    const studentSchedules = await repository.findSchedulesByStudentId(id, transaction);
-    const enrollmentIds = (Array.isArray(enrollments) ? enrollments.map((e) => Number(e.id)).filter((v) => Number.isInteger(v) && v > 0) : []);
-    const enrollmentSchedules = enrollmentIds.length ? await repository.findSchedulesByEnrollmentIds(enrollmentIds, transaction) : [];
-    const scheduleIds = [
-      ...new Set([
-        ...enrollments.map((enrollment) => Number(enrollment.schedule_id)),
-        ...studentSchedules.map((schedule) => Number(schedule.id)),
-        ...enrollmentSchedules.map((s) => Number(s.id)),
-      ].filter((scheduleId) => Number.isInteger(scheduleId) && scheduleId > 0)),
-    ];
+    // Kinukuha natin ang mga Database Models para magamit pang-delete
+    const { Op } = require("sequelize");
+    const { Schedule, Enrollment, PromoPackage, PromoEntitlement, StudentProfile, Student: StudentModel } = require("../../../models");
 
-    if (scheduleIds.length) {
-      await repository.detachEnrollmentsFromSchedules(scheduleIds, transaction);
-      await repository.deleteSchedulesByIds(scheduleIds, transaction);
+    // 1. Hanapin ang lahat ng enrollments ng student
+    const enrollments = await Enrollment.findAll({ where: { student_id: id }, transaction });
+    const enrollmentIds = enrollments.map((e) => e.id);
+
+    // 2. I-set sa null ang schedule_id ng enrollment para hindi mag-error kapag binura natin ang schedules
+    if (enrollmentIds.length > 0) {
+      await Enrollment.update({ schedule_id: null }, { where: { student_id: id }, transaction });
     }
 
-    const profile = await repository.findStudentProfileByStudentId(id, transaction);
-    await repository.detachEnrollmentsFromStudent(id, transaction);
+    // 3. BURAHIN NANG TULUYAN ANG MGA SCHEDULES (Yung nag-iiwan ng ghost booking sa Instructor)
+    const scheduleWhere = { [Op.or]: [{ student_id: id }] };
+    if (enrollmentIds.length > 0) {
+      scheduleWhere[Op.or].push({ enrollment_id: { [Op.in]: enrollmentIds } });
+    }
+    await Schedule.destroy({ where: scheduleWhere, transaction });
 
-    if (profile) {
-      await repository.deleteStudentProfile(profile, transaction);
+    // 4. Burahin ang Payments, Promos, at Enrollments
+    if (enrollmentIds.length > 0) {
+      await Payment.destroy({ where: { enrollment_id: { [Op.in]: enrollmentIds } }, transaction });
+
+      const promoPackages = await PromoPackage.findAll({ where: { student_id: id }, transaction });
+      const promoPackageIds = promoPackages.map(p => p.id);
+      
+      if (promoPackageIds.length > 0) {
+        await PromoEntitlement.destroy({ where: { promo_package_id: { [Op.in]: promoPackageIds } }, transaction });
+        await PromoPackage.destroy({ where: { id: { [Op.in]: promoPackageIds } }, transaction });
+      }
+
+      await Enrollment.destroy({ where: { student_id: id }, transaction });
     }
 
-    await repository.deleteStudent(student, transaction);
+    // 5. Burahin ang Profile at Student Record
+    await StudentProfile.destroy({ where: { student_id: id }, transaction });
+    await StudentModel.destroy({ where: { id }, transaction });
+
     await transaction.commit();
   } catch (error) {
     await transaction.rollback();

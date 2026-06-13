@@ -1,4 +1,4 @@
-import { ArrowUpDown, ChevronDown, ChevronUp, Clock, Eye, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpDown, ChevronDown, ChevronUp, Clock, Eye, Pencil, Trash2, Calendar } from "lucide-react";
 import {
   buildAddress,
   getCourseCode,
@@ -120,6 +120,7 @@ export default function StudentTable({
   onView,
   onEdit,
   onUpdateStatus,
+  onViewSchedule, // BAGONG PROP GALING SA PARENT (StudentsPage.jsx)
   onDelete,
   canDelete,
   onClickPendingBadge,
@@ -133,7 +134,7 @@ export default function StudentTable({
   onToggleSort,
 }) {
   const renderMobileActions = (student) => (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2 mt-3">
       <button
         type="button"
         onClick={() => onView(student)}
@@ -157,6 +158,15 @@ export default function StudentTable({
       >
         <Clock size={14} className="text-[#800000]" />
         Update
+      </button>
+      {/* ✅ ADDED: SCHEDULE BUTTON SA MOBILE VIEW */}
+      <button
+        type="button"
+        onClick={() => onViewSchedule?.(student)}
+        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+      >
+        <Calendar size={14} className="text-[#800000]" />
+        Schedule
       </button>
       {canDelete ? (
         <button
@@ -334,7 +344,7 @@ export default function StudentTable({
               <th className="w-[170px] px-4 py-3 font-semibold">Starting / Registration Date</th>
               <th className="w-[170px] px-4 py-3 font-semibold">End / Completion Date</th>
               <th className="w-[220px] px-4 py-3 font-semibold">Address</th>
-              <th className="w-[210px] rounded-tr-xl px-4 py-3 font-semibold">Actions</th>
+              <th className="w-[300px] rounded-tr-xl px-4 py-3 font-semibold">Actions</th> {/* Lumaki nang konti para kumasya yung 5 buttons */}
             </tr>
           </thead>
           <tbody>
@@ -464,7 +474,7 @@ export default function StudentTable({
                         <ClampedText value={buildAddress(student.StudentProfile)} />
                       </td>
                       <td className="px-4 py-2.5 align-top whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 whitespace-nowrap text-slate-700">
+                        <div className="flex flex-wrap items-center gap-1.5 whitespace-nowrap text-slate-700">
                           <button
                             type="button"
                             onClick={() => onView(student)}
@@ -491,6 +501,16 @@ export default function StudentTable({
                           >
                             <Clock size={16} className="text-[#800000]" />
                             Update
+                          </button>
+                          {/* ✅ ADDED: SCHEDULE BUTTON SA DESKTOP VIEW */}
+                          <button
+                            type="button"
+                            onClick={() => onViewSchedule?.(student)}
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            title="View Schedule"
+                          >
+                            <Calendar size={16} className="text-[#800000]" />
+                            Schedule
                           </button>
                           {canDelete ? (
                             <button
