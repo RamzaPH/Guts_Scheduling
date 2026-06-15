@@ -444,7 +444,6 @@ export function AddressSection({ type, form, onFieldChange }) {
   );
   const barangayOptions = useMemo(() => getBarangayOptions(form.profile.city), [form.profile.city]);
   
-  // Dito natin kinukuha ang auto zip code mula sa function natin (IDINAGDAG NA ANG BARANGAY)
   const autoZipCode = useMemo(
     () => getZipCodeByAddressCodes(form.extras.region, form.profile.province, form.profile.city, form.profile.barangay),
     [form.extras.region, form.profile.province, form.profile.city, form.profile.barangay]
@@ -458,7 +457,6 @@ export function AddressSection({ type, form, onFieldChange }) {
       return;
     }
 
-    // Ito ang nagse-set sa form ng nahanap na zip code
     if (autoZipCode && String(form.profile.zip_code || "") !== String(autoZipCode)) {
       onFieldChange("profile", "zip_code", autoZipCode);
     }
@@ -480,6 +478,8 @@ export function AddressSection({ type, form, onFieldChange }) {
         <FormField
           label="STREET / PHASE / SUBDIVISION"
           name="street"
+          value={form.profile.street} 
+          // ✅ FIX: Dinagdag ko yung value={form.profile.street} para makapag type ka na! Hahaha
           onChange={(event) => onFieldChange("profile", "street", event.target.value)}
           placeholder="Street / Phase / Subdivision"
           required={type === "PDC" || type === "TDC" || type === "PROMO"}
@@ -539,7 +539,6 @@ export function AddressSection({ type, form, onFieldChange }) {
           onChange={(event) => onFieldChange("profile", "zip_code", event.target.value)}
           placeholder="Auto-filled Zip Code"
           required
-          // Idinagdag ito para hindi na i-type ng user manually dahil nag-aauto fill na siya
           inputClassName="bg-slate-100 cursor-not-allowed"
           readOnly
           tabIndex={-1}
